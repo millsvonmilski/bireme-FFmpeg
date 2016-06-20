@@ -95,3 +95,7 @@
 /tools/seek_print
 /tools/uncoded_frame
 /tools/zmqsend
+FfmpegAudioVideoToolboxDecoders.xcodeproj/project.xcworkspace
+FfmpegAudioVideoToolboxDecoders.xcodeproj/xcuserdata
+build
+patch.diff

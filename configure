@@ -2255,6 +2255,9 @@ qsvenc_select="qsv"
 rdft_select="fft"
 
 # decoders / encoders
+h264_videotoolbox_decoder_select="videotoolbox_decoder"
+aac_audiotoolbox_decoder_select="audiotoolbox_decoder"
+mp3_audiotoolbox_decoder_select="audiotoolbox_decoder"
 aac_decoder_select="imdct15 mdct sinewin"
 aac_fixed_decoder_select="mdct sinewin"
 aac_encoder_select="audio_frame_queue iirfilter lpc mdct sinewin"
@@ -2500,6 +2503,10 @@ vdpau_deps="vdpau_vdpau_h vdpau_vdpau_x11_h"
 videotoolbox_deps="VideoToolbox_VideoToolbox_h pthreads"
 videotoolbox_extralibs="-framework CoreFoundation -framework VideoToolbox -framework CoreMedia -framework QuartzCore -framework CoreVideo"
 xvmc_deps="X11_extensions_XvMClib_h"
+
+h264_videotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreVideo -framework VideoToolbox"
+aac_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
+mp3_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
 
 h263_vaapi_hwaccel_deps="vaapi"
 h263_vaapi_hwaccel_select="h263_decoder"
