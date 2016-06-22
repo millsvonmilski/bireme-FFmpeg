@@ -144,14 +144,24 @@ vt_h264_decoder_callback(void*             _self,
     }
 
     // copy the data
-    memcpy(frame->data[0], CVPixelBufferGetBaseAddressOfPlane(image_buffer, 0), frame->linesize[0]*frame->height);
     {
-        const uint8_t* cb_cr_in = CVPixelBufferGetBaseAddressOfPlane(image_buffer, 1);
-        uint8_t*       cb_out   = frame->data[1];
-        uint8_t*       cr_out   = frame->data[2];
-        unsigned int x,y;
+        unsigned int   y_in_bpr     = (unsigned int)CVPixelBufferGetBytesPerRowOfPlane(image_buffer, 0);
+        const uint8_t* y_in         = CVPixelBufferGetBaseAddressOfPlane(image_buffer, 0);
+        uint8_t*       y_out        = frame->data[0];
+        unsigned int   cb_cr_in_bpr = (unsigned int)CVPixelBufferGetBytesPerRowOfPlane(image_buffer, 1);
+        unsigned int   x,y;
+
+        for (y=0; y<frame->height; y++) {
+            memcpy(y_out, y_in, y_in_bpr);
+            y_out += frame->linesize[0];
+            y_in  += y_in_bpr;
+        }
+        
         for (y=0; y<frame->height/2; y++) {
-            for (x=0; x<frame->linesize[1]; x++) {
+            const uint8_t* cb_cr_in = CVPixelBufferGetBaseAddressOfPlane(image_buffer, 1)+y*cb_cr_in_bpr;
+            uint8_t*       cb_out   = frame->data[1]+y*frame->linesize[1];
+            uint8_t*       cr_out   = frame->data[2]+y*frame->linesize[2];
+            for (x=0; x<cb_cr_in_bpr; x++) {
                 *cb_out++ = *cb_cr_in++;
                 *cr_out++ = *cb_cr_in++;
             }
