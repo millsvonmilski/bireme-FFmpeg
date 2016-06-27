@@ -23,6 +23,7 @@
  * simple media player based on the FFmpeg libraries
  */
 //#define HAVE_STRUCT_POLLFD 1
+#define inline
 #include "config.h"
 #include <inttypes.h>
 #include <math.h>

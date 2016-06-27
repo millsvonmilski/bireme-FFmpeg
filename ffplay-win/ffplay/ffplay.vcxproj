@@ -69,14 +69,14 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>c:\SDL-1.2.15\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)SDL-1.2.15\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <LibraryWPath>$(LibraryWPath)</LibraryWPath>
-    <LibraryPath>C:\SDL-1.2.15\lib\x86;C:\bt\ffmpeg-3-vc\ffplay-win\libs;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
+    <LibraryPath>$(SolutionDir)SDL-1.2.15\lib\x86;$(SolutionDir)libs;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>c:\SDL-1.2.15\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\bt\ffmpeg-3-vc\ffplay\libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)SDL-1.2.15\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)SDL-1.2.15\lib\x64;$(SolutionDir)libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -107,6 +107,13 @@
       </ForceFileOutput>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>copy $(SolutionDir)SDL-1.2.15\lib\x86\sdl.dll $(OutputPath)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -115,14 +122,27 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
+      <SDLCheck>false</SDLCheck>
       <CompileAs>Default</CompileAs>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libavutil.a;libavcodec.a;libavdevice.a;libavfilter.a;libavformat.a;libswscale.a;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libavutil.a;libavcodec.a;libavdevice.a;libavfilter.a;libavformat.a;libswscale.a;sdl.lib;Ws2_32.lib;libswresample.a;Strmiids.lib;Shlwapi.lib;SECUR32.LIB;vfw32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>copy ..\..\libavcodec\libavcodec.a ..\libs
+copy ..\..\libavdevice\libavdevice.a ..\libs
+copy ..\..\libavfilter\libavfilter.a ..\libs
+copy ..\..\libavformat\libavformat.a ..\libs
+copy ..\..\libavutil\libavutil.a ..\libs
+copy ..\..\libswresample\libswresample.a ..\libs
+copy ..\..\libswscale\libswscale.a ..\libs</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>copy $(SolutionDir)SDL-1.2.15\lib\x64\sdl.dll $(OutputPath)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
