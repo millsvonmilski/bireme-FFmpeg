@@ -22,7 +22,7 @@
  * @file
  * simple media player based on the FFmpeg libraries
  */
-
+//#define HAVE_STRUCT_POLLFD 1
 #include "config.h"
 #include <inttypes.h>
 #include <math.h>
@@ -46,6 +46,7 @@
 #include "libavutil/opt.h"
 #include "libavcodec/avfft.h"
 #include "libswresample/swresample.h"
+#include "compat/msvcrt/snprintf.h"
 
 #if CONFIG_AVFILTER
 # include "libavfilter/avfilter.h"
@@ -263,7 +264,7 @@ typedef struct VideoState {
 
     enum ShowMode {
         SHOW_MODE_NONE = -1, SHOW_MODE_VIDEO = 0, SHOW_MODE_WAVES, SHOW_MODE_RDFT, SHOW_MODE_NB
-    } show_mode;
+    }eShowMode;
     int16_t sample_array[SAMPLE_ARRAY_SIZE];
     int sample_array_index;
     int last_i_start;
@@ -373,7 +374,7 @@ static int opt_add_vfilter(void *optctx, const char *opt, const char *arg)
 }
 #endif
 
-static inline
+static 
 int cmp_audio_fmts(enum AVSampleFormat fmt1, int64_t channel_count1,
                    enum AVSampleFormat fmt2, int64_t channel_count2)
 {
@@ -384,7 +385,7 @@ int cmp_audio_fmts(enum AVSampleFormat fmt1, int64_t channel_count1,
         return channel_count1 != channel_count2 || fmt1 != fmt2;
 }
 
-static inline
+static 
 int64_t get_valid_channel_layout(int64_t channel_layout, int channels)
 {
     if (channel_layout && av_get_channel_layout_nb_channels(channel_layout) == channels)
@@ -402,7 +403,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     if (q->abort_request)
        return -1;
 
-    pkt1 = av_malloc(sizeof(MyAVPacketList));
+    pkt1 = (MyAVPacketList*)av_malloc(sizeof(MyAVPacketList));
     if (!pkt1)
         return -1;
     pkt1->pkt = *pkt;
@@ -802,7 +803,7 @@ static void decoder_abort(Decoder *d, FrameQueue *fq)
     packet_queue_flush(d->queue);
 }
 
-static inline void fill_rectangle(SDL_Surface *screen,
+static void fill_rectangle(SDL_Surface *screen,
                                   int x, int y, int w, int h, int color, int update)
 {
     SDL_Rect rect;
@@ -988,7 +989,7 @@ static void video_image_display(VideoState *is)
     }
 }
 
-static inline int compute_mod(int a, int b)
+static int compute_mod(int a, int b)
 {
     return a < 0 ? a%b + b : a%b;
 }
@@ -1008,7 +1009,7 @@ static void video_audio_display(VideoState *s)
     channels = s->audio_tgt.channels;
     nb_display_channels = channels;
     if (!s->paused) {
-        int data_used= s->show_mode == SHOW_MODE_WAVES ? s->width : (2*nb_freq);
+        int data_used= s->eShowMode == SHOW_MODE_WAVES ? s->width : (2*nb_freq);
         n = 2 * channels;
         delay = s->audio_write_buf_size;
         delay /= n;
@@ -1025,7 +1026,7 @@ static void video_audio_display(VideoState *s)
             delay = data_used;
 
         i_start= x = compute_mod(s->sample_array_index - delay * channels, SAMPLE_ARRAY_SIZE);
-        if (s->show_mode == SHOW_MODE_WAVES) {
+        if (s->eShowMode == SHOW_MODE_WAVES) {
             h = INT_MIN;
             for (i = 0; i < 1000; i += channels) {
                 int idx = (SAMPLE_ARRAY_SIZE + x - i) % SAMPLE_ARRAY_SIZE;
@@ -1047,7 +1048,7 @@ static void video_audio_display(VideoState *s)
     }
 
     bgcolor = SDL_MapRGB(screen->format, 0x00, 0x00, 0x00);
-    if (s->show_mode == SHOW_MODE_WAVES) {
+    if (s->eShowMode == SHOW_MODE_WAVES) {
         fill_rectangle(screen,
                        s->xleft, s->ytop, s->width, s->height,
                        bgcolor, 0);
@@ -1098,7 +1099,7 @@ static void video_audio_display(VideoState *s)
         }
         if (!s->rdft || !s->rdft_data){
             av_log(NULL, AV_LOG_ERROR, "Failed to allocate buffers for RDFT, switching to waves display\n");
-            s->show_mode = SHOW_MODE_WAVES;
+            s->eShowMode = SHOW_MODE_WAVES;
         } else {
             FFTSample *data[2];
             for (ch = 0; ch < nb_display_channels; ch++) {
@@ -1304,7 +1305,7 @@ static void video_display(VideoState *is)
 {
     if (!screen)
         video_open(is, 0, NULL);
-    if (is->audio_st && is->show_mode != SHOW_MODE_VIDEO)
+    if (is->audio_st && is->eShowMode != SHOW_MODE_VIDEO)
         video_audio_display(is);
     else if (is->video_st)
         video_image_display(is);
@@ -1518,7 +1519,7 @@ static void video_refresh(void *opaque, double *remaining_time)
     if (!is->paused && get_master_sync_type(is) == AV_SYNC_EXTERNAL_CLOCK && is->realtime)
         check_external_clock_speed(is);
 
-    if (!display_disable && is->show_mode != SHOW_MODE_VIDEO && is->audio_st) {
+    if (!display_disable && is->eShowMode != SHOW_MODE_VIDEO && is->audio_st) {
         time = av_gettime_relative() / 1000000.0;
         if (is->force_refresh || is->last_vis_time + rdftspeed < time) {
             video_display(is);
@@ -1610,7 +1611,7 @@ retry:
 
 display:
             /* display picture */
-            if (!display_disable && is->show_mode == SHOW_MODE_VIDEO)
+            if (!display_disable && is->eShowMode == SHOW_MODE_VIDEO)
                 video_display(is);
 
             frame_queue_next(&is->pictq);
@@ -2544,7 +2545,7 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
                is->audio_buf      = is->silence_buf;
                is->audio_buf_size = sizeof(is->silence_buf) / is->audio_tgt.frame_size * is->audio_tgt.frame_size;
            } else {
-               if (is->show_mode != SHOW_MODE_VIDEO)
+               if (is->eShowMode != SHOW_MODE_VIDEO)
                    update_sample_display(is, (int16_t *)is->audio_buf, audio_size);
                is->audio_buf_size = audio_size;
            }
@@ -2961,7 +2962,7 @@ static int read_thread(void *arg)
                                  st_index[AVMEDIA_TYPE_VIDEO]),
                                 NULL, 0);
 
-    is->show_mode = show_mode;
+    is->eShowMode = show_mode;
     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
         AVStream *st = ic->streams[st_index[AVMEDIA_TYPE_VIDEO]];
         AVCodecContext *avctx = st->codec;
@@ -2979,8 +2980,8 @@ static int read_thread(void *arg)
     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
         ret = stream_component_open(is, st_index[AVMEDIA_TYPE_VIDEO]);
     }
-    if (is->show_mode == SHOW_MODE_NONE)
-        is->show_mode = ret >= 0 ? SHOW_MODE_VIDEO : SHOW_MODE_RDFT;
+    if (is->eShowMode == SHOW_MODE_NONE)
+        is->eShowMode = ret >= 0 ? SHOW_MODE_VIDEO : SHOW_MODE_RDFT;
 
     if (st_index[AVMEDIA_TYPE_SUBTITLE] >= 0) {
         stream_component_open(is, st_index[AVMEDIA_TYPE_SUBTITLE]);
@@ -3285,16 +3286,16 @@ static void toggle_full_screen(VideoState *is)
 static void toggle_audio_display(VideoState *is)
 {
     int bgcolor = SDL_MapRGB(screen->format, 0x00, 0x00, 0x00);
-    int next = is->show_mode;
+    int next = is->eShowMode;
     do {
         next = (next + 1) % SHOW_MODE_NB;
-    } while (next != is->show_mode && (next == SHOW_MODE_VIDEO && !is->video_st || next != SHOW_MODE_VIDEO && !is->audio_st));
-    if (is->show_mode != next) {
+    } while (next != is->eShowMode && (next == SHOW_MODE_VIDEO && !is->video_st || next != SHOW_MODE_VIDEO && !is->audio_st));
+    if (is->eShowMode != next) {
         fill_rectangle(screen,
                     is->xleft, is->ytop, is->width, is->height,
                     bgcolor, 1);
         is->force_refresh = 1;
-        is->show_mode = next;
+        is->eShowMode = next;
     }
 }
 
@@ -3309,7 +3310,7 @@ static void refresh_loop_wait_event(VideoState *is, SDL_Event *event) {
         if (remaining_time > 0.0)
             av_usleep((int64_t)(remaining_time * 1000000.0));
         remaining_time = REFRESH_RATE;
-        if (is->show_mode != SHOW_MODE_NONE && (!is->paused || is->force_refresh))
+        if (is->eShowMode != SHOW_MODE_NONE && (!is->paused || is->force_refresh))
             video_refresh(is, &remaining_time);
         SDL_PumpEvents();
     }
@@ -3400,7 +3401,7 @@ static void event_loop(VideoState *cur_stream)
                 break;
             case SDLK_w:
 #if CONFIG_AVFILTER
-                if (cur_stream->show_mode == SHOW_MODE_VIDEO && cur_stream->vfilter_idx < nb_vfilters - 1) {
+                if (cur_stream->eShowMode == SHOW_MODE_VIDEO && cur_stream->vfilter_idx < nb_vfilters - 1) {
                     if (++cur_stream->vfilter_idx >= nb_vfilters)
                         cur_stream->vfilter_idx = 0;
                 } else {
@@ -3595,6 +3596,10 @@ static int opt_sync(void *optctx, const char *opt, const char *arg)
     }
     return 0;
 }
+C_LINKAGE int SDL_main(int argc, char *argv[])
+{
+    return main(argc, argv);
+}
 
 static int opt_seek(void *optctx, const char *opt, const char *arg)
 {
@@ -3764,7 +3769,108 @@ static int lockmgr(void **mtx, enum AVLockOp op)
    return 1;
 }
 
-/* Called from the main */
+#include <Windows.h>
+
+PCHAR*
+CommandLineToArgvA(
+PCHAR CmdLine,
+int* _argc
+)
+{
+    PCHAR* argv;
+    PCHAR  _argv;
+    ULONG   len;
+    ULONG   argc;
+    CHAR   a;
+    ULONG   i, j;
+
+    BOOLEAN  in_QM;
+    BOOLEAN  in_TEXT;
+    BOOLEAN  in_SPACE;
+
+    len = strlen(CmdLine);
+    i = ((len + 2) / 2)*sizeof(PVOID) + sizeof(PVOID);
+
+    argv = (PCHAR*)GlobalAlloc(GMEM_FIXED,
+        i + (len + 2)*sizeof(CHAR));
+
+    _argv = (PCHAR)(((PUCHAR)argv) + i);
+
+    argc = 0;
+    argv[argc] = _argv;
+    in_QM = FALSE;
+    in_TEXT = FALSE;
+    in_SPACE = TRUE;
+    i = 0;
+    j = 0;
+
+    while (a = CmdLine[i]) {
+        if (in_QM) {
+            if (a == '\"') {
+                in_QM = FALSE;
+            }
+            else {
+                _argv[j] = a;
+                j++;
+            }
+        }
+        else {
+            switch (a) {
+            case '\"':
+                in_QM = TRUE;
+                in_TEXT = TRUE;
+                if (in_SPACE) {
+                    argv[argc] = _argv + j;
+                    argc++;
+                }
+                in_SPACE = FALSE;
+                break;
+            case ' ':
+            case '\t':
+            case '\n':
+            case '\r':
+                if (in_TEXT) {
+                    _argv[j] = '\0';
+                    j++;
+                }
+                in_TEXT = FALSE;
+                in_SPACE = TRUE;
+                break;
+            default:
+                in_TEXT = TRUE;
+                if (in_SPACE) {
+                    argv[argc] = _argv + j;
+                    argc++;
+                }
+                _argv[j] = a;
+                j++;
+                in_SPACE = FALSE;
+                break;
+            }
+        }
+        i++;
+    }
+    _argv[j] = '\0';
+    argv[argc] = NULL;
+
+    (*_argc) = argc;
+    return argv;
+}
+
+
+int CALLBACK WinMain(
+    _In_ HINSTANCE hInstance,
+    _In_ HINSTANCE hPrevInstance,
+    _In_ LPSTR     lpCmdLine,
+    _In_ int       nCmdShow
+    )
+{
+    int nArgs = 0;
+    LPSTR* sz = CommandLineToArgvA(lpCmdLine, &nArgs);
+    return main(nArgs, sz);
+}
+
+///* Called from the main */
 int main(int argc, char **argv)
 {
     int flags;

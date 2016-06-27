@@ -19,6 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#define inline 
+//#define HAVE_STRUCT_POLLFD 1
+
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -54,6 +57,7 @@
 #include "libavutil/ffversion.h"
 #include "libavutil/version.h"
 #include "cmdutils.h"
+#include "compat/msvcrt/snprintf.h"
 #if CONFIG_NETWORK
 #include "libavformat/network.h"
 #endif
@@ -1079,15 +1083,15 @@ static int warned_cfg = 0;
 
 static void print_all_libs_info(int flags, int level)
 {
-    PRINT_LIB_INFO(avutil,     AVUTIL,     flags, level);
-    PRINT_LIB_INFO(avcodec,    AVCODEC,    flags, level);
-    PRINT_LIB_INFO(avformat,   AVFORMAT,   flags, level);
-    PRINT_LIB_INFO(avdevice,   AVDEVICE,   flags, level);
-    PRINT_LIB_INFO(avfilter,   AVFILTER,   flags, level);
-    PRINT_LIB_INFO(avresample, AVRESAMPLE, flags, level);
-    PRINT_LIB_INFO(swscale,    SWSCALE,    flags, level);
-    PRINT_LIB_INFO(swresample, SWRESAMPLE, flags, level);
-    PRINT_LIB_INFO(postproc,   POSTPROC,   flags, level);
+    //PRINT_LIB_INFO(avutil,     AVUTIL,     flags, level);
+    //PRINT_LIB_INFO(avcodec,    AVCODEC,    flags, level);
+    //PRINT_LIB_INFO(avformat,   AVFORMAT,   flags, level);
+    //PRINT_LIB_INFO(avdevice,   AVDEVICE,   flags, level);
+    //PRINT_LIB_INFO(avfilter,   AVFILTER,   flags, level);
+    //PRINT_LIB_INFO(avresample, AVRESAMPLE, flags, level);
+    //PRINT_LIB_INFO(swscale,    SWSCALE,    flags, level);
+    //PRINT_LIB_INFO(swresample, SWRESAMPLE, flags, level);
+    //PRINT_LIB_INFO(postproc,   POSTPROC,   flags, level);
 }
 
 static void print_program_info(int flags, int level)

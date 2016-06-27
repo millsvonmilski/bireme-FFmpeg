@@ -50,7 +50,7 @@ typedef struct AVRational{
  * Useful for compilers that do not support compound literals.
  * @note  The return value is not reduced.
  */
-static inline AVRational av_make_q(int num, int den)
+static AVRational av_make_q(int num, int den)
 {
     AVRational r = { num, den };
     return r;
@@ -63,7 +63,7 @@ static inline AVRational av_make_q(int num, int den)
  * @return 0 if a==b, 1 if a>b, -1 if a<b, and INT_MIN if one of the
  * values is of the form 0/0
  */
-static inline int av_cmp_q(AVRational a, AVRational b){
+static int av_cmp_q(AVRational a, AVRational b){
     const int64_t tmp= a.num * (int64_t)b.den - b.num * (int64_t)a.den;
 
     if(tmp) return (int)((tmp ^ a.den ^ b.den)>>63)|1;
@@ -77,7 +77,7 @@ static inline int av_cmp_q(AVRational a, AVRational b){
  * @param a rational to convert
  * @return (double) a
  */
-static inline double av_q2d(AVRational a){
+static double av_q2d(AVRational a){
     return a.num / (double) a.den;
 }
 
