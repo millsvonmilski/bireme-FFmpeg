@@ -108,8 +108,13 @@
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy ..\..\libavcodec\libavcodec.a ..\libs
+copy ..\..\libavdevice\libavdevice.a ..\libs
+copy ..\..\libavfilter\libavfilter.a ..\libs
+copy ..\..\libavformat\libavformat.a ..\libs
+copy ..\..\libavutil\libavutil.a ..\libs
+copy ..\..\libswresample\libswresample.a ..\libs
+copy ..\..\libswscale\libswscale.a ..\libs</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>copy $(SolutionDir)SDL-1.2.15\lib\x86\sdl.dll $(OutputPath)</Command>
