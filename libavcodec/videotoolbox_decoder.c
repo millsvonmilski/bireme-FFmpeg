@@ -1,3 +1,14 @@
+/*----------------------------------------------------------------
+| config
++----------------------------------------------------------------*/
+/* undefine this to get rid of the identifying mark in the pictures  */
+/* or define it to a max-4 digit number encoded as hex-coded decimal */
+/* (don't use hex chars A-F)                                         */
+#define VT_H264_DECODER_IDENTIFYING_MARK 0x1234
+
+/*----------------------------------------------------------------
+| includes
++----------------------------------------------------------------*/
 #include "libavcodec/avcodec.h"
 #include "libavutil/avutil.h"
 #include "libavutil/opt.h"
@@ -37,6 +48,21 @@ static const AVProfile vt_h264_decoder_profiles[] = {
     { FF_PROFILE_H264_CAVLC_444,            "CAVLC 4:4:4"           },
     { FF_PROFILE_UNKNOWN },
 };
+
+#if defined(VT_H264_DECODER_IDENTIFYING_MARK)
+static const unsigned char DigitPatterns[10][5] = {
+    {7,5,5,5,7},
+    {2,2,2,2,2},
+    {7,1,7,4,7},
+    {7,1,3,1,7},
+    {4,5,7,1,1},
+    {7,4,7,1,7},
+    {4,4,7,5,7},
+    {7,1,1,1,1},
+    {7,5,7,5,7},
+    {7,5,7,1,1}
+};
+#endif
 
 /*----------------------------------------------------------------*/
 static void
@@ -158,7 +184,7 @@ vt_h264_decoder_callback(void*             _self,
         }
         
         for (y=0; y<frame->height/2; y++) {
-            const uint8_t* cb_cr_in = CVPixelBufferGetBaseAddressOfPlane(image_buffer, 1)+y*cb_cr_in_bpr;
+            const uint8_t* cb_cr_in = (const uint8_t*)CVPixelBufferGetBaseAddressOfPlane(image_buffer, 1)+y*cb_cr_in_bpr;
             uint8_t*       cb_out   = frame->data[1]+y*frame->linesize[1];
             uint8_t*       cr_out   = frame->data[2]+y*frame->linesize[2];
             for (x=0; x<cb_cr_in_bpr; x++) {
@@ -171,17 +197,33 @@ vt_h264_decoder_callback(void*             _self,
     // unlock the buffer
     CVPixelBufferUnlockBaseAddress(image_buffer, kCVPixelBufferLock_ReadOnly);
 
+#if defined(VT_H264_DECODER_IDENTIFYING_MARK)
     // TEST: add pattern for debugging purposes
-    if (frame->width > 50 && frame->height > 50){
+    {
         unsigned int x;
         unsigned int y;
-        for (y=20; y<50; y++) {
-            for (x=20; x<50; x++) {
-                frame->data[0][x+y*frame->linesize[0]] = 255-frame->data[0][x+y*frame->linesize[0]];
+        for (y=0; y<7; y++) {
+            for (x=0; x<20; x++) {
+                unsigned int xx;
+                unsigned int yy;
+                unsigned int pixel = 0;
+                if (y>=1 && y<=5 && (x%5) >= 1 && (x%5) <= 3) {
+                    unsigned int offset = ( (VT_H264_DECODER_IDENTIFYING_MARK >> (12-4*(x/5))) & 0x0F) % 10;
+                    unsigned char bits = DigitPatterns[offset][y-1];
+                    if ((bits >> (3-(x%5))) & 1) {
+                        pixel = 1;
+                    }
+                }
+                for (yy=y*8; yy<(y+1)*8 && yy<frame->height; yy++) {
+                    for (xx=x*8; xx<(x+1)*8 && xx<frame->linesize[0]; xx++) {
+                        if (pixel == 0) frame->data[0][xx+yy*frame->linesize[0]] = 255-frame->data[0][xx+yy*frame->linesize[0]];
+                    }
+                }
             }
         }
     }
-    
+#endif
+
     // all is good
     self->frame = frame;
 }
@@ -331,7 +373,12 @@ vt_h264_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPack
     // default return value
     *got_frame = 0;
 
-    // keep track of the output frame for the callback
+    // return now if the input buffer is empty
+    if (avpkt == NULL || avpkt->data == NULL || avpkt->size == 0) {
+        return 0;
+    }
+    
+// keep track of the output frame for the callback
     self->frame = (AVFrame*)data;
     
     // setup the sample timing
