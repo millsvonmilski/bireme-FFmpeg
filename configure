@@ -5838,8 +5838,8 @@ if ! disabled sdl; then
             enable sdl
         elif enabled sdl ; then
             #die "ERROR: SDL not found"
-            sdl_cflags="-Ic:/users/gilles/Develop/SDL-1.2.15/include"
-            sdl_libs="-lSDL -Lc:/users/gilles/Develop/SDL-1.2.15/lib/x86"
+            sdl_cflags="-Ic:/users/JP/Desktop/SDL-1.2.15/include"
+            sdl_libs="-lSDL -Lc:/users/JP/Desktop/SDL-1.2.15/lib/x86"
             enable sdl
         else
             disable sdl
