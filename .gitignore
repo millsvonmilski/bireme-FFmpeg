@@ -33,3 +33,9 @@
 /lcov/
 /src
 /mapfile
+mf_audio_decoder.obj
+FfmpegMftDecoders/.vs/
+FfmpegMftDecoders/FfmpegMftDecoders.VC.db
+FfmpegMftDecoders/FfmpegMftDecoders/Debug/
+FfmpegMftDecoders/FfmpegMftDecoders/FfmpegMftDecoders.vcxproj.user
+FfmpegMftDecoders/FfmpegMftDecoders.VC.VC.opendb
