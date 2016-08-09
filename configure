@@ -5837,9 +5837,8 @@ if ! disabled sdl; then
             check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) < 0x010300" $sdl_cflags &&
             enable sdl
         elif enabled sdl ; then
-            #die "ERROR: SDL not found"
-            sdl_cflags="-Ic:/users/JP/Desktop/SDL-1.2.15/include"
-            sdl_libs="-lSDL -Lc:/users/JP/Desktop/SDL-1.2.15/lib/x86"
+            sdl_cflags="-ID:/bt/FFmpeg/ffplay-win/SDL-1.2.15/include"
+            sdl_libs="-lSDL -LD:/bt/FFmpeg/ffplay-win/SDL-1.2.15/lib/x86"
             enable sdl
         else
             disable sdl

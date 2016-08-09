@@ -1,0 +1,8 @@
+//original 
+./configure --toolchain=msvc --optflags='-Zi -Od -Og - ' --arch=x86 --enable-sdl --enable-yasm --enable-asm --enable-shared --disable-static --enable-debug --disable-everything --disable-dxva2 --disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages --disable-network --enable-ffprobe --enable-ffplay --enable-protocol=file --enable-filter=scale --enable-demuxer=m4v,mov,mp3 --enable-filter=aresample --enable-decoder=h264_mf_video,aac_mf_audio,mp3_mf_audio --prefix=/c/Users/Jan/Temp/ffmpeg
+
+// no ffplay for use with sln
+./configure --toolchain=msvc --arch=x86_64 --enable-yasm --enable-asm --enable-shared --disable-static --enable-debug --disable-everything --disable-dxva2 --disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages --disable-network --enable-protocol=file --enable-filter=scale --enable-demuxer=m4v,mov,mp3 --enable-filter=aresample --enable-decoder=h264_mf_video,aac_mf_audio,mp3_mf_audio --prefix=/c/Users/Jan/Temp/ffmpeg
+
+/// gets ffplay and ffmpeg.  Still some hacking required
+./configure --toolchain=msvc --arch=x86_64 --enable-yasm --enable-asm --enable-debug --disable-dxva2 --disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages --disable-network --enable-ffprobe --enable-protocol=file --enable-filter=scale --enable-ffplay --enable-sdl --enable-demuxer=m4v,mov,mp3 --enable-filter=aresample --enable-decoder=h264_mf_video,aac_mf_audio,mp3_mf_audio --prefix=/c/Users/Jan/Temp/ffmpeg

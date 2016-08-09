@@ -339,7 +339,7 @@ static int exit_on_mousedown;
 static int loop = 1;
 static int framedrop = -1;
 static int infinite_buffer = -1;
-static enum ShowMode show_mode = SHOW_MODE_NONE;
+static enum ShowMode show_mode = -1;
 static const char *audio_codec_name;
 static const char *subtitle_codec_name;
 static const char *video_codec_name;
