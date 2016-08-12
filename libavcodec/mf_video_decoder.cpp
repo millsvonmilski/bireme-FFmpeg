@@ -16,6 +16,10 @@ extern "C" {
 #include "libavcodec/avcodec.h"
 }
 
+#include <atlbase.h>
+#include <atlcom.h>
+#include <atlcoll.h>
+#include <queue>
 #include <mfapi.h>
 #include <mftransform.h>
 #include <mferror.h>
@@ -24,6 +28,7 @@ extern "C" {
 | constants
 +----------------------------------------------------------------*/
 #define MF_VIDEO_DECODER_VERSION 0x010000
+using namespace ATL;
 
 const int MF_VIDEO_DECODER_SUCCESS        =  0;
 const int MF_VIDEO_DECODER_FAILURE        = -1;
@@ -61,6 +66,8 @@ static const unsigned char DigitPatterns[10][5] = {
     {7,5,7,1,1}
 };
 #endif
+
+std::queue<CComPtr<IMFSample>> sample_queue;
 
 /*----------------------------------------------------------------------
 |    macros
@@ -500,10 +507,10 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		if (bytes_consumed) break;
 
 		// create a sample
-		IMFSample* sample = NULL;
+		CComPtr<IMFSample> sample;
 		HRESULT mf_result = MFCreateSample(&sample);
 
-		IMFMediaBuffer* buffer = NULL;
+		CComPtr<IMFMediaBuffer> buffer;
 		mf_result = MFCreateMemoryBuffer(filtered_packet.size, &buffer);
 
 		BYTE* buffer_address = NULL;
@@ -525,12 +532,28 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		}
 
 		if (MF_SUCCEEDED(mf_result)) {
-			mf_result = self->decoder->ProcessInput(0, sample, 0);
+			CComPtr<IMFSample> spSample;
+			if (!sample_queue.empty())
+			{
+				spSample = sample_queue.front();
+			}
+			else
+			{
+				spSample = sample;
+			}
+			mf_result = self->decoder->ProcessInput(0, spSample, 0);
 			if (MF_SUCCEEDED(mf_result)) {
 				bytes_consumed = input_packet->size;
+				if (spSample.p != sample && sample_queue.size())
+				{
+					sample_queue.pop();
+					sample_queue.push(sample);
+				}
 			} else {
 				done = true;
 				if (mf_result = MF_E_NOTACCEPTING) {
+					//if (spSample.p == sample)
+					sample_queue.push(sample);
 					result = MF_VIDEO_DECODER_SUCCESS;
 					bytes_consumed = 0;
 				} else {
@@ -543,8 +566,6 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 			done = true;
 		}
 
-		if (buffer) buffer->Release();
-		if (sample) sample->Release();
 	}
 
 	// cleanup
