@@ -107,6 +107,7 @@
       <ForceFileOutput>
       </ForceFileOutput>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <AdditionalLibraryDirectories>$(SolutionDir)libs;$(SolutionDir)SDL-1.2.15;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>copy ..\..\libavcodec\libavcodec.a ..\libs
@@ -136,6 +137,7 @@ copy ..\..\libswscale\libswscale.a ..\libs</Command>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>libavutil.a;libavcodec.a;libavdevice.a;libavfilter.a;libavformat.a;libswscale.a;sdl.lib;Ws2_32.lib;libswresample.a;Strmiids.lib;Shlwapi.lib;SECUR32.LIB;vfw32.lib;Shell32.lib;Mf.lib;MFCore.lib;MfPlat.lib;mfplay.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)libs;$(SolutionDir)SDL-1.2.15;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>copy ..\..\libavcodec\libavcodec.a ..\libs
