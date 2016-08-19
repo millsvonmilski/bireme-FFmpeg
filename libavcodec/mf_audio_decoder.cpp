@@ -20,6 +20,9 @@ extern "C" {
 #include <mftransform.h>
 #include <mferror.h>
 #include <Wmcodecdsp.h>
+#include <atlbase.h>
+#include <atlcom.h>
+#include <queue>
 
 /*----------------------------------------------------------------
 | constants
@@ -36,6 +39,16 @@ const int MF_AUDIO_DECODER_NEED_DATA      = -3;
 #define MF_AUDIO_DECODER_ADD_IDENTIFYING_SOUND_AMP    5000
 #define MF_AUDIO_DECODER_ADD_IDENTIFYING_SOUND_REPEAT 40
 
+typedef struct SampleQueueAudioElement
+{
+	CComPtr<IMFSample> spSample;
+	int	sample_size;
+	AVFrame* frame;
+	AVCodecContext* avctx;
+
+};
+
+std::queue<SampleQueueAudioElement> sample_queue;
 
 /*----------------------------------------------------------------------
 |    macros
@@ -633,7 +646,44 @@ mf_audio_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 			mf_result = sample->AddBuffer(buffer);
 		}
 
-		mf_result = self->decoder->ProcessInput(0, sample, 0);
+		SampleQueueAudioElement sqe;
+		if (!sample_queue.empty())
+		{
+			sqe = sample_queue.front();
+		}
+		else
+		{
+			sqe.spSample = sample;
+			sqe.sample_size = avpkt->size;
+			sqe.frame = frame;
+			sqe.avctx = avctx;
+		}
+
+		mf_result = self->decoder->ProcessInput(0, sqe.spSample, 0);
+		if (MF_SUCCEEDED(mf_result)) {
+			bytes_consumed = sqe.sample_size;
+			if (sqe.spSample.p != sample)
+			{
+				sample_queue.pop();
+				sqe.spSample = sample;
+				sqe.sample_size = avpkt->size;
+				sample_queue.push(sqe);
+				//printf("\nBefore purge, queue size = %i\n", sample_queue.size());
+				//self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0);
+				while (!sample_queue.empty())
+				{
+					SampleQueueAudioElement sqeProcess = sample_queue.front();
+					mf_audio_decoder_convert_output(sqeProcess.avctx, sqeProcess.frame);
+					mf_result = self->decoder->ProcessInput(0, sqeProcess.spSample, 0);
+					//printf("result = %X\n", mf_result);
+					if (SUCCEEDED(mf_result))
+					{
+						sample_queue.pop();
+					}
+				}
+				//printf("\nAfter purge, queue size = %i result = %x\n", sample_queue.size(), mf_result);
+			}
+		}
 		if (MF_FAILED(mf_result)) {
 			av_log(avctx, AV_LOG_WARNING, "ProcessInput failed (%d)\n", mf_result);
 			result = MF_AUDIO_DECODER_FAILURE;
