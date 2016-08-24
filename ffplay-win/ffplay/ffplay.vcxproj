@@ -181,7 +181,6 @@ copy ..\..\libswscale\libswscale.a ..\libs</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
       <CompileAs>Default</CompileAs>
     </ClCompile>
     <Link>
