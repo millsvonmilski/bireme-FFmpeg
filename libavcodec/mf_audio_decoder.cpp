@@ -169,13 +169,14 @@ mf_audio_decoder_close(AVCodecContext* avctx)
 {
     MF_AUDIO_DecoderContext* self = (MF_AUDIO_DecoderContext*)avctx->priv_data;
 
-    av_log(avctx, AV_LOG_TRACE, "mf_audio_decoder_close\n");
+    av_log(avctx, AV_LOG_WARNING, "\nmf_audio_decoder_close\n");
 
 	if (self->decoder) {
 		self->decoder->Release();
 		self->decoder = NULL;
 	}
 
+    MFShutdown();
     return 0;
 }
 
@@ -305,7 +306,7 @@ mf_audio_decoder_init(AVCodecContext* avctx)
 {
     MF_AUDIO_DecoderContext* self = (MF_AUDIO_DecoderContext*)avctx->priv_data;
 
-    av_log(avctx, AV_LOG_TRACE, "mf_audio_decoder_init\n");
+    av_log(avctx, AV_LOG_WARNING, "\nmf_audio_decoder_init\n");
 
 	// init
 	self->decoder                   = NULL;
@@ -346,7 +347,7 @@ mf_audio_decoder_init(AVCodecContext* avctx)
 		IMFActivate** factories = NULL;
 		UINT32        factory_count = 0;
 
-		HRESULT mf_result = MFTEnumEx(MFT_CATEGORY_AUDIO_DECODER,
+		mf_result = MFTEnumEx(MFT_CATEGORY_AUDIO_DECODER,
 									  flags,
 									  &input_type_info,
 									  &output_type_info,
@@ -354,7 +355,7 @@ mf_audio_decoder_init(AVCodecContext* avctx)
 									  &factory_count);
 
 		IMFActivate* decoder_factory = NULL;
-		av_log(avctx, AV_LOG_TRACE, "found %d decoders\n", factory_count);
+		av_log(avctx, AV_LOG_WARNING, "found %d audio decoders\n", factory_count);
 
 		if (factory_count > 0) {
 			decoder_factory = factories[0];
@@ -386,7 +387,31 @@ mf_audio_decoder_init(AVCodecContext* avctx)
 		return -1;
 	}
 
-    // set the input type if we can
+	// Collect statistics on the decoder
+	DWORD inputMin;
+	DWORD inputMax;
+	DWORD outputMin;
+	DWORD outputMax;
+	mf_result = self->decoder->GetStreamLimits(&inputMin, &inputMax, &outputMin, &outputMax);
+	if (S_OK == mf_result)
+	{
+		av_log(avctx, AV_LOG_WARNING, "audio decoder input min/max %d/%d output min/max %d/%d\n", inputMin, inputMax, outputMin, outputMax);
+	}
+	else
+	{
+		av_log(avctx, AV_LOG_ERROR, "Can't obtain audio decoder input/output min/max error %d\n", mf_result);
+	}
+	mf_result = self->decoder->GetStreamCount(&inputMin, &outputMin);
+	if (S_OK == mf_result)
+	{
+		av_log(avctx, AV_LOG_WARNING, "audio decoder current stream count input/output %d/%d\n", inputMin, outputMin);
+	}
+	else
+	{
+		av_log(avctx, AV_LOG_ERROR, "Can't obtain audio decoder input/output stream count error %d\n", mf_result);
+	}
+
+	// set the input type if we can
 	mf_audio_decoder_set_input_type(avctx);
 
     // set the output type
@@ -541,7 +566,7 @@ mf_audio_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 	MF_AUDIO_DecoderContext* self = (MF_AUDIO_DecoderContext*)avctx->priv_data;
 	AVFrame*                 frame = (AVFrame*)data;
 
-	av_log(avctx, AV_LOG_TRACE, "mf_audio_decoder_decode - size=%d\n", avpkt->size);
+	//av_log(avctx, AV_LOG_WARNING, "\nmf_audio_decoder_decode - size=%d\n", avpkt->size);
 
 	// default return value
 	*got_frame = 0;
@@ -580,6 +605,22 @@ mf_audio_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		mf_audio_decoder_set_output_type(avctx);
 	}
 
+	if (0 == avpkt->size)
+	{
+		//self->foundEnd = true;
+		av_log(avctx, AV_LOG_WARNING, "\nmf_audio_decoder_decode encountered empty input_packet\n");
+		// Assume empty input packet means FFmpeg reached end of source stream
+		if (S_OK != self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0))
+		{
+			av_log(avctx, AV_LOG_WARNING, "mf_video_decoder_decode encountered bad result sending NOTIFY_END_OF_STREAM message\n");
+		}
+		else if (S_OK != self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, NULL))
+		{
+			av_log(avctx, AV_LOG_WARNING, "mf_video_decoder_decode encountered bad result sending COMMAND_DRAIN message\n");
+		}
+		return 0;
+	}
+
 	// process the input data
 	unsigned int bytes_consumed = 0;
 	int result = MF_AUDIO_DECODER_SUCCESS;
@@ -605,8 +646,8 @@ mf_audio_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		}
 
 		// feed more data if we haven't done so already
-		if (bytes_consumed) break;
-		bytes_consumed = avpkt->size;
+		//if (bytes_consumed) break;
+		bytes_consumed += avpkt->size;
 
 		// create a sample
 		IMFSample* sample = NULL;
@@ -654,10 +695,13 @@ mf_audio_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 static void
 mf_audio_decoder_flush(AVCodecContext *avctx)
 {
-    //MF_AUDIO_DecoderContext* self = (MF_AUDIO_DecoderContext*)avctx->priv_data;
+    MF_AUDIO_DecoderContext* self = (MF_AUDIO_DecoderContext*)avctx->priv_data;
 
-    av_log(avctx, AV_LOG_TRACE, "mf_audio_decoder_flush\n");
+    av_log(avctx, AV_LOG_WARNING, "\nmf_audio_decoder_flush\n");
 
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa965264(v=vs.85).aspx
+	// "To flush and MFT, call IMFTransform::ProcessMessage with the MFT_MESSAGE_COMMAND_FLUSH message"
+	self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, NULL);
 }
 
 /*----------------------------------------------------------------
