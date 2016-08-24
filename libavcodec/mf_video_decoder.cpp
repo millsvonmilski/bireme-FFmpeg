@@ -3,8 +3,7 @@
 +----------------------------------------------------------------*/
 // undefine this to get rid of the identifying mark in the pictures
 // or define it to a max-4 digit number encoded as hex-coded decimal
-// (don't use hex chars A-F)
-#define MF_VIDEO_DECODER_IDENTIFYING_MARK 0x1234
+#define MF_VIDEO_DECODER_IDENTIFYING_MARK 0xF00D
 
 /*----------------------------------------------------------------
 | includes
@@ -54,7 +53,8 @@ static const AVProfile mf_video_decoder_profiles[] = {
 };
 
 #if defined(MF_VIDEO_DECODER_IDENTIFYING_MARK)
-static const unsigned char DigitPatterns[10][5] = {
+static const size_t DigitPatternsCount = 16;
+static const unsigned char DigitPatterns[DigitPatternsCount][5] = {
     {7,5,5,5,7},
     {2,2,2,2,2},
     {7,1,7,4,7},
@@ -64,7 +64,13 @@ static const unsigned char DigitPatterns[10][5] = {
     {4,4,7,5,7},
     {7,1,1,1,1},
     {7,5,7,5,7},
-    {7,5,7,1,1}
+    {7,5,7,1,1},
+	{ 7,5,7,5,5 },
+	{ 6,5,6,5,6 },
+	{ 7,4,4,4,7 },
+	{ 6,5,5,5,6 },
+	{ 7,4,6,4,7 },
+	{ 7,4,6,4,4 },
 };
 #endif
 
@@ -89,6 +95,7 @@ typedef struct {
     
 	AVBSFContext* annexb_bsf_ctx;
 	IMFTransform* decoder;
+	bool foundEnd;
 } MF_VIDEO_DecoderContext;
 
 /*----------------------------------------------------------------*/
@@ -96,7 +103,7 @@ static int
 mf_video_decoder_close(AVCodecContext* avctx)
 {
 	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
-    av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_close\n");
+    av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_close\n");
 
 	OutputDebugString(_T("mf_video_decoder_close\n"));
 	if (self->annexb_bsf_ctx) {
@@ -106,15 +113,19 @@ mf_video_decoder_close(AVCodecContext* avctx)
 		self->decoder->Release();
 		self->decoder = NULL;
 	}
+	self->foundEnd = false;
 
+    MFShutdown();
     return 0;
 }
 
 /*----------------------------------------------------------------*/
 static void
-mf_video_decoder_set_output_type(MF_VIDEO_DecoderContext* self)
+mf_video_decoder_set_output_type(AVCodecContext* avctx)
 {
-    // set output type
+	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
+
+	// set output type
     IMFMediaType* output_type = NULL;
     HRESULT mf_result = S_OK;
 	bool done = false;
@@ -123,20 +134,43 @@ mf_video_decoder_set_output_type(MF_VIDEO_DecoderContext* self)
         if (MF_SUCCEEDED(mf_result)) {
             GUID subtype;
             mf_result = output_type->GetGUID(MF_MT_SUBTYPE, &subtype);
-            if (MF_SUCCEEDED(mf_result) && (subtype == MFVideoFormat_I420 || subtype == MFVideoFormat_IYUV)) {
-                mf_result = self->decoder->SetOutputType(0, output_type, 0);
-                if (MF_SUCCEEDED(mf_result)) {
-					done = true;
-                }
-            }
-            output_type->Release();
+            if (MF_SUCCEEDED(mf_result))
+			{
+				if (subtype == MFVideoFormat_I420 || subtype == MFVideoFormat_IYUV) {
+					mf_result = self->decoder->SetOutputType(0, output_type, 0);
+					if (MF_SUCCEEDED(mf_result)) {
+						done = true;
+					}
+					else
+					{
+						av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_set_output_type - failed SetOutputType %d\n", mf_result);
+					}
+				}
+				else
+				{
+					CComBSTR iyuvBstr(MFVideoFormat_IYUV);
+					CComBSTR i420Bstr(MFVideoFormat_I420);
+					CComBSTR subtypeBstr(subtype);
+					av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_set_output_type - unexpected subtype %S (cf. MFVideoFormat_I420 %S MFVideoFormat_IYUV %S\n",
+						subtypeBstr, i420Bstr, iyuvBstr);
+				}
+			}
+			else
+			{
+				av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_set_output_type - failed GetGUID %d\n", mf_result);
+			}
+			output_type->Release();
         }
+		else
+		{
+			av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_set_output_type - failed GetOutputAvailableType %d\n", mf_result);
+		}
     }
 }
 
 /*----------------------------------------------------------------*/
 static HRESULT
-mf_video_decoder_get_stride(IMFMediaType* media_type, LONG& stride)
+mf_video_decoder_get_stride(AVCodecContext* avctx, IMFMediaType* media_type, LONG& stride)
 {
 	stride = 0;
     UINT32 stride_32 = 0;
@@ -154,21 +188,25 @@ mf_video_decoder_get_stride(IMFMediaType* media_type, LONG& stride)
         // get the subtype and the image size.
         mf_result = media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
         if (MF_FAILED(mf_result)) {
-            goto end;
+			av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_get_stride - failed GetGUID %d\n", mf_result);
+			goto end;
         }
 
         mf_result = MFGetAttributeSize(media_type, MF_MT_FRAME_SIZE, &width, &height);
         if (MF_FAILED(mf_result)) {
-            goto end;
+			av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_get_stride - failed MFGetAttributeSize %d\n", mf_result);
+			goto end;
         }
 
         mf_result = MFGetStrideForBitmapInfoHeader(subtype.Data1, width, &stride);
         if (MF_FAILED(mf_result)) {
-            goto end;
+			av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_get_stride - failed MFGetStrideForBitmapInfoHeader %d\n", mf_result);
+			goto end;
         }
 
 		// set the attribute for later reference.
-        (void)media_type->SetUINT32(MF_MT_DEFAULT_STRIDE, UINT32(stride));
+		av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_get_stride - stride %d\n", stride);
+		(void)media_type->SetUINT32(MF_MT_DEFAULT_STRIDE, UINT32(stride));
     }
 
 end:
@@ -181,11 +219,12 @@ mf_video_decoder_init(AVCodecContext* avctx)
 {
     MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
 
-    av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_init\n");
+    av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_init\n");
 
 	// init/
 	self->annexb_bsf_ctx = NULL;
 	self->decoder = NULL;
+	self->foundEnd = false;
 
 	// init the annex-b filter
 	const AVBitStreamFilter* annexb_bsf = av_bsf_get_by_name("h264_mp4toannexb");
@@ -230,7 +269,7 @@ mf_video_decoder_init(AVCodecContext* avctx)
                                   &factory_count);
 
     IMFActivate* decoder_factory = NULL;
-    av_log(avctx, AV_LOG_TRACE, "found %d decoders\n", factory_count);
+    av_log(avctx, AV_LOG_WARNING, "found %d decoders\n", factory_count);
 
     if (factory_count > 0) {
         decoder_factory = factories[0];
@@ -251,6 +290,30 @@ mf_video_decoder_init(AVCodecContext* avctx)
 		return -1;
 	}
 
+    // Collect statistics on the decoder
+    DWORD inputMin;
+    DWORD inputMax;
+    DWORD outputMin;
+    DWORD outputMax;
+    mf_result = self->decoder->GetStreamLimits(&inputMin, &inputMax, &outputMin, &outputMax);
+    if (S_OK == mf_result)
+    {
+        av_log(avctx, AV_LOG_WARNING, "decoder input min/max %d/%d output min/max %d/%d\n", inputMin, inputMax, outputMin, outputMax);
+    }
+    else
+    {
+        av_log(avctx, AV_LOG_ERROR, "Can't obtain decoder input/output min/max error %d\n", mf_result);
+    }
+    mf_result = self->decoder->GetStreamCount(&inputMin, &outputMin);
+    if (S_OK == mf_result)
+    {
+        av_log(avctx, AV_LOG_WARNING, "decoder current stream count input/output %d/%d\n", inputMin, outputMin);
+    }
+    else
+    {
+        av_log(avctx, AV_LOG_ERROR, "Can't obtain decoder input/output stream count error %d\n", mf_result);
+    }
+
     // set the input type
     IMFMediaType* input_type = NULL;
     mf_result = self->decoder->GetInputAvailableType(0, 0, &input_type);
@@ -267,7 +330,7 @@ mf_video_decoder_init(AVCodecContext* avctx)
     }
 
     // set the output type
-    mf_video_decoder_set_output_type(self);
+    mf_video_decoder_set_output_type(avctx);
 
     // make sure the decoder is ready
     self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, NULL);
@@ -308,6 +371,7 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
 		}
 
 		if (!MF_SUCCEEDED(mf_result)) {
+			av_log(avctx, AV_LOG_ERROR, "MFCreateSample/MFCreate(Aligned)MemoryBuffer/AddBuffer failed, returned %d\n", mf_result);
 			return MF_VIDEO_DECODER_FAILURE;
 		}
 	}
@@ -319,12 +383,13 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
 	output_buffer.pSample = sample;
 	mf_result = self->decoder->ProcessOutput(0, 1, &output_buffer, &status);
 	if (mf_result == MF_E_TRANSFORM_STREAM_CHANGE) {
-		mf_video_decoder_set_output_type(self);
+		mf_video_decoder_set_output_type(avctx);
 		mf_result = self->decoder->ProcessOutput(0, 1, &output_buffer, &status);
 	}
 	int result = MF_VIDEO_DECODER_SUCCESS;
 	if (mf_result == MF_E_TRANSFORM_NEED_MORE_INPUT) {
 		result = MF_VIDEO_DECODER_NEED_DATA;
+		av_log(avctx, AV_LOG_ERROR, "\nProcessOutput returned MF_E_TRANSFORM_NEED_MORE_INPUT %x\n", mf_result);
 		goto end;
 	} else if (MF_FAILED(mf_result)) {
 		av_log(avctx, AV_LOG_WARNING, "ProcessOutput returned %d\n", mf_result);
@@ -353,7 +418,7 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
 
 	// compute the image stride
 	LONG stride = 0;
-	mf_result = mf_video_decoder_get_stride(output_type, stride);
+	mf_result = mf_video_decoder_get_stride(avctx, output_type, stride);
 	if (MF_FAILED(mf_result)) {
 		av_log(avctx, AV_LOG_WARNING, "mf_video_decoder_get_stride failed (%d)\n", mf_result);
 		goto end;
@@ -426,7 +491,7 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
                 unsigned int yy;
                 unsigned int pixel = 0;
                 if (y>=1 && y<=5 && (x%5) >= 1 && (x%5) <= 3) {
-                    unsigned int offset = ( (MF_VIDEO_DECODER_IDENTIFYING_MARK >> (12-4*(x/5))) & 0x0F) % 10;
+                    unsigned int offset = ( (MF_VIDEO_DECODER_IDENTIFYING_MARK >> (12-4*(x/5))) & 0x0F) % DigitPatternsCount;
                     unsigned char bits = DigitPatterns[offset][y-1];
                     if ((bits >> (3-(x%5))) & 1) {
                         pixel = 1;
@@ -453,7 +518,6 @@ end:
 }
 
 
-void mf_video_decoder_flush(AVCodecContext *avctx); //forward
 /*----------------------------------------------------------------*/
 static int
 mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPacket* input_packet)
@@ -461,7 +525,7 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
 	AVFrame*                 frame = (AVFrame*)data;
 
-	av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_decode - size=%d\n", input_packet->size);
+	//av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_decode - size=%d    \n", input_packet->size);
 
 	// default return value
 	*got_frame = 0;
@@ -474,67 +538,80 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		return -1;
 	}
 
-	// convert the input buffer to annexb format
-	AVPacket workspace_packet = { 0 };
-	av_packet_ref(&workspace_packet, input_packet);
-	int av_result = av_bsf_send_packet(self->annexb_bsf_ctx, &workspace_packet);
-	if (av_result != 0) {
-		av_log(avctx, AV_LOG_WARNING, "av_bsf_send_packet failed (%d)\n", av_result);
-		av_packet_unref(&workspace_packet);
-		return -1;
+	if (NULL == input_packet)
+	{
+		av_log(avctx, AV_LOG_WARNING, "mf_video_decoder_decode encountered NULL input_packet\n");
 	}
 	AVPacket filtered_packet = { 0 };
-	av_result = av_bsf_receive_packet(self->annexb_bsf_ctx, &filtered_packet);
-	if (av_result != 0) {
-		av_log(avctx, AV_LOG_WARNING, "av_bsf_receive_packet failed (%d)\n", av_result);
-		mf_video_decoder_flush(avctx);
-		return 0;
+	if (0 == input_packet->size)
+	{
+		self->foundEnd = true;
+		av_log(avctx, AV_LOG_WARNING, "empty input_packet - sample_queue.size() %u\n", sample_queue.size());
+		// Assume empty input packet means FFmpeg reached end of source stream
+		if (S_OK != self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0))
+		{
+			av_log(avctx, AV_LOG_ERROR, "mf_video_decoder_decode encountered bad result sending NOTIFY_END_OF_STREAM message\n");
+		}
+		else if (S_OK != self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, NULL))
+		{
+			av_log(avctx, AV_LOG_ERROR, "mf_video_decoder_decode encountered bad result sending COMMAND_DRAIN message\n");
+		}
+	}
+	else {
+		// convert the input buffer to annexb format
+		AVPacket workspace_packet = { 0 };
+		av_packet_ref(&workspace_packet, input_packet);
+		int av_result = av_bsf_send_packet(self->annexb_bsf_ctx, &workspace_packet);
+		if (av_result != 0) {
+			av_log(avctx, AV_LOG_WARNING, "av_bsf_send_packet failed (%d)\n", av_result);
+			av_packet_unref(&workspace_packet);
+			return -1;
+		}
+		av_result = av_bsf_receive_packet(self->annexb_bsf_ctx, &filtered_packet);
+		if (av_result != 0) {
+			av_log(avctx, AV_LOG_WARNING, "av_bsf_receive_packet failed (%d)\n", av_result);
+			return 0;
+		}
 	}
 
 	// process the input data
 	int result = MF_VIDEO_DECODER_SUCCESS;
 	unsigned int bytes_consumed = 0;
-	bool done = false;
-	while (!done) {
-		// get an output picture if one is ready
-		result = mf_video_decoder_get_next_picture(avctx, frame);
-		if (result == MF_VIDEO_DECODER_SUCCESS) {
-			*got_frame = 1;
-			done = true;
-		} else if (result == MF_VIDEO_DECODER_NEED_DATA) {
-			result = MF_VIDEO_DECODER_SUCCESS;
-		} else {
-			break;
-		}
-
+	if (input_packet->size || !sample_queue.empty())
+	{
 		// try to feed more data if we haven't done so already
-		if (bytes_consumed) break;
+		//if (bytes_consumed) break;
 
 		// create a sample
 		CComPtr<IMFSample> sample;
-		HRESULT mf_result = MFCreateSample(&sample);
+		HRESULT mf_result = S_OK;
+		if (input_packet->size) {
+			CComPtr<IMFMediaBuffer> buffer;
+			BYTE* buffer_address = NULL;
 
-		CComPtr<IMFMediaBuffer> buffer;
-		mf_result = MFCreateMemoryBuffer(filtered_packet.size, &buffer);
+			mf_result = MFCreateSample(&sample);
 
-		BYTE* buffer_address = NULL;
-		if (MF_SUCCEEDED(mf_result)) {
-			mf_result = buffer->Lock(&buffer_address, NULL, NULL);
+			if (MF_SUCCEEDED(mf_result)) {
+				mf_result = MFCreateMemoryBuffer(filtered_packet.size, &buffer);
+			}
+
+			if (MF_SUCCEEDED(mf_result)) {
+				mf_result = buffer->Lock(&buffer_address, NULL, NULL);
+			}
+
+			if (MF_SUCCEEDED(mf_result)) {
+				memcpy(buffer_address, filtered_packet.data, filtered_packet.size);
+				mf_result = buffer->Unlock();
+			}
+
+			if (MF_SUCCEEDED(mf_result)) {
+				mf_result = buffer->SetCurrentLength(filtered_packet.size);
+			}
+
+			if (MF_SUCCEEDED(mf_result)) {
+				mf_result = sample->AddBuffer(buffer);
+			}
 		}
-
-		if (MF_SUCCEEDED(mf_result)) {
-			memcpy(buffer_address, filtered_packet.data, filtered_packet.size);
-			mf_result = buffer->Unlock();
-		}
-
-		if (MF_SUCCEEDED(mf_result)) {
-			mf_result = buffer->SetCurrentLength(filtered_packet.size);
-		}
-
-		if (MF_SUCCEEDED(mf_result)) {
-			mf_result = sample->AddBuffer(buffer);
-		}
-
 		if (MF_SUCCEEDED(mf_result)) {
 			CComPtr<IMFSample> spSample;
 			if (!sample_queue.empty())
@@ -547,48 +624,52 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 			}
 			mf_result = self->decoder->ProcessInput(0, spSample, 0);
 			if (MF_SUCCEEDED(mf_result)) {
-				bytes_consumed = input_packet->size;
+				bytes_consumed += input_packet->size;
 				if (spSample.p != sample)
 				{
 					sample_queue.pop();
-					sample_queue.push(sample);
-					while (!sample_queue.empty() && SUCCEEDED(mf_result))
-					{
-						CComPtr<IMFSample> spQueueSample = sample_queue.front();
-						mf_result = self->decoder->ProcessInput(0, spQueueSample, 0);
-						if (SUCCEEDED(mf_result))
-						{
-							sample_queue.pop();
-						}
+					if (input_packet->size) {
+						sample_queue.push(sample);
 					}
-					int cEls = sample_queue.size();
+					size_t cEls = sample_queue.size();
 					CString str;
-					str.Format(_T("After purge, queue size = %i\n"), cEls);
+					str.Format(_T("After purge, queue size = %u\n"), cEls);
 					OutputDebugString(str);
-					//done = true;
+					av_log(avctx, AV_LOG_WARNING, "\nAfter purge, queue size = %u\n", cEls);
 				}
-			} else {
-				//done = true;
+			}
+			else {
 				if (mf_result = MF_E_NOTACCEPTING) {
-					//if (spSample.p == sample)
-					int cEls = sample_queue.size();
+					size_t cEls = sample_queue.size();
 					CString str;
-					str.Format(_T("queue size = %i\n"), cEls);
+					str.Format(_T("queue size = %u\n"), cEls);
 					OutputDebugString(str);
-					sample_queue.push(sample);
+					if (input_packet->size) {
+						sample_queue.push(sample);
+					}
 					result = MF_VIDEO_DECODER_SUCCESS;
-					bytes_consumed = 0;
-				} else {
-					done = true;
-					av_log(avctx, AV_LOG_WARNING, "ProcessInput failed (%d)\n", mf_result);
+				}
+				else {
+					av_log(avctx, AV_LOG_WARNING, "\nProcessInput failed (%d)\n", mf_result);
 					result = MF_VIDEO_DECODER_FAILURE;
 				}
 			}
-		} else {
-			result = MF_VIDEO_DECODER_ERROR_INTERNAL;
-			done = true;
 		}
+		else {
+			result = MF_VIDEO_DECODER_ERROR_INTERNAL;
+			av_log(avctx, AV_LOG_WARNING, "\nInternal error in decoder (%d)\n", mf_result);
+		}
+	}
 
+	if (result == MF_VIDEO_DECODER_SUCCESS) {
+		// get an output picture if one is ready
+		result = mf_video_decoder_get_next_picture(avctx, frame);
+		if (result == MF_VIDEO_DECODER_SUCCESS) {
+			*got_frame = 1;
+		}
+		else if (result == MF_VIDEO_DECODER_NEED_DATA) {
+			result = MF_VIDEO_DECODER_SUCCESS;
+		}
 	}
 
 	// cleanup
@@ -606,19 +687,11 @@ static void
 mf_video_decoder_flush(AVCodecContext *avctx)
 {
 	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
-
-	if (self && self->decoder)
-	{
-		CComPtr<IMFSample> spSample;
-		HRESULT mf_result;
-		while (!sample_queue.empty() && (spSample = sample_queue.front()) != nullptr)
-		{
-			mf_result = self->decoder->ProcessInput(0, spSample, 0);
-			sample_queue.pop();
-		}
-	}
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/aa965264(v=vs.85).aspx
+    // "To flush and MFT, call IMFTransform::ProcessMessage with the MFT_MESSAGE_COMMAND_FLUSH message"
+    self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, NULL);
 	OutputDebugString(_T("mf_video_decoder_flush\n"));
-    av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_flush\n");
+    av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_flush\n");
 
 }
 
