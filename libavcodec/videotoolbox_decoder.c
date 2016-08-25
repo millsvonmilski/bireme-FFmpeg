@@ -4,7 +4,7 @@
 /* undefine this to get rid of the identifying mark in the pictures  */
 /* or define it to a max-4 digit number encoded as hex-coded decimal */
 /* (don't use hex chars A-F)                                         */
-#define VT_H264_DECODER_IDENTIFYING_MARK 0x1234
+#define VT_H264_DECODER_IDENTIFYING_MARK 0x1236
 
 /*----------------------------------------------------------------
 | includes
