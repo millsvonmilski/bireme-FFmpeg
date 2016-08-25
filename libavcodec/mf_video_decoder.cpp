@@ -183,6 +183,14 @@ end:
     return mf_result;
 }
 
+/*
+* Low latency mode for Windows 8. Without this option, the H264
+* decoder will fill *all* its internal buffers before returning a
+* frame. Because of this behavior, the decoder might return no frame
+* for more than 500 ms, making it unusable for playback.
+*/
+DEFINE_GUID(CODECAPI_AVLowLatencyMode, 0x9c27891a, 0xed7a, 0x40e1, 0x88, 0xe8, 0xb2, 0x27, 0x27, 0xa0, 0x24, 0xee);
+
 /*----------------------------------------------------------------*/
 static int
 mf_video_decoder_init(AVCodecContext* avctx)
@@ -281,6 +289,19 @@ mf_video_decoder_init(AVCodecContext* avctx)
 	if (FAILED(self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, NULL)))
 	{
 		MessageBox(NULL, _T("Process Failed"), _T("DEBUG"), 0);
+	}
+
+	CComPtr<IMFAttributes> spAttributes;
+
+	HRESULT hr = self->decoder->GetAttributes(&spAttributes);
+	if (FAILED(hr))
+	{
+		MessageBoxA(NULL, "GetAttributes", "FAIL", 0);
+	}
+	hr = spAttributes->SetUINT32(CODECAPI_AVLowLatencyMode, VARIANT_TRUE);
+	if (FAILED(hr))
+	{
+		MessageBoxA(NULL, "SetAttributes", "FAIL", 0);
 	}
 
     return 0;
@@ -491,44 +512,8 @@ static int process_next_packet(AVCodecContext* avctx, void* data, int* got_frame
 	int result = MF_VIDEO_DECODER_SUCCESS;
 	unsigned int bytes_consumed = 0;
 	bool done = false;
-	while (!done) {
-		// get an output picture if one is ready
-		result = mf_video_decoder_get_next_picture(avctx, frame);
-		if (result == MF_VIDEO_DECODER_SUCCESS) {
-			*got_frame = 1;
-			done = true;
-		}
-		else if (result == MF_VIDEO_DECODER_NEED_DATA) {
-			//MessageBox(NULL, "Foo", "bar", 0);
-			result = MF_VIDEO_DECODER_SUCCESS;
-		}
-		else {
-			break;
-		}
-
-		if (input_packet->size == 0)
-		{
-			int queue_size = 0;
-			if (self && self->decoder)
-			{
-				SampleQueueElement sqe;
-				HRESULT mf_result;
-				while (!sample_queue.empty())
-				{
-					sqe = sample_queue.front();
-					mf_result = self->decoder->ProcessInput(0, sqe.spSample, 0);
-					queue_size += sqe.sample_size;
-					sample_queue.pop();
-				}
-			}
-			return queue_size;
-		}
-		// try to feed more data if we haven't done so already
-		if (bytes_consumed)
-		{
-			break;
-		}
-
+	while (!done) 
+	{
 		// create a sample
 		CComPtr<IMFSample> sample;
 		HRESULT mf_result = MFCreateSample(&sample);
@@ -578,10 +563,9 @@ static int process_next_packet(AVCodecContext* avctx, void* data, int* got_frame
 					sample_queue.push(sqe);
 					//printf("\nBefore purge, queue size = %i\n", sample_queue.size());
 					//self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0);
-					while (!sample_queue.empty())
+					while (!sample_queue.empty() && SUCCEEDED(mf_result))
 					{
 						SampleQueueElement sqeProcess = sample_queue.front();
-						mf_video_decoder_get_next_picture(sqeProcess.avctx, sqeProcess.frame);
 						mf_result = self->decoder->ProcessInput(0, sqeProcess.spSample, 0);
 						//printf("result = %X\n", mf_result);
 						if (SUCCEEDED(mf_result))
@@ -590,11 +574,9 @@ static int process_next_packet(AVCodecContext* avctx, void* data, int* got_frame
 						}
 					}
 					//printf("\nAfter purge, queue size = %i result = %x\n", sample_queue.size(), mf_result);
-					done = true;
 				}
 			}
 			else {
-				done = true;
 				if (mf_result = MF_E_NOTACCEPTING) {
 					//if (spSample.p == sample)
 					int cEls = sample_queue.size();
@@ -617,6 +599,21 @@ static int process_next_packet(AVCodecContext* avctx, void* data, int* got_frame
 			result = MF_VIDEO_DECODER_ERROR_INTERNAL;
 			done = true;
 		}
+
+		// get an output picture if one is ready
+		result = mf_video_decoder_get_next_picture(avctx, frame);
+		if (result == MF_VIDEO_DECODER_SUCCESS) {
+			*got_frame = 1;
+			done = true;
+		}
+		else if (result == MF_VIDEO_DECODER_NEED_DATA) {
+			//MessageBox(NULL, "Foo", "bar", 0);
+			result = MF_VIDEO_DECODER_SUCCESS;
+		}
+		else {
+			break;
+		}
+
 
 	}
 
