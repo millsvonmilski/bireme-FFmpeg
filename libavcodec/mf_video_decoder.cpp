@@ -536,6 +536,7 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 {
 	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
 	AVFrame*                 frame = (AVFrame*)data;
+	int result = MF_VIDEO_DECODER_SUCCESS;
 
 	//av_log(avctx, AV_LOG_WARNING, "\nmf_video_decoder_decode - size=%d    \n", input_packet->size);
 
@@ -550,11 +551,23 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		return -1;
 	}
 
+	// Use the get before give strategy apparently used in VLC and others
+	if (result == MF_VIDEO_DECODER_SUCCESS) {
+		// get an output picture if one is ready
+		result = mf_video_decoder_get_next_picture(avctx, frame);
+		if (result == MF_VIDEO_DECODER_SUCCESS) {
+			*got_frame = 1;
+		}
+		else if (result == MF_VIDEO_DECODER_NEED_DATA) {
+			result = MF_VIDEO_DECODER_SUCCESS;
+		}
+	}
+
+	AVPacket filtered_packet = { 0 };
 	if (NULL == input_packet)
 	{
 		av_log(avctx, AV_LOG_WARNING, "mf_video_decoder_decode encountered NULL input_packet\n");
 	}
-	AVPacket filtered_packet = { 0 };
 	if (0 == input_packet->size)
 	{
 		self->foundEnd = true;
@@ -587,7 +600,6 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 	}
 
 	// process the input data
-	int result = MF_VIDEO_DECODER_SUCCESS;
 	unsigned int bytes_consumed = 0;
 	if (input_packet->size || !sample_queue.empty())
 	{
@@ -644,21 +656,16 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 						sample_queue.push(sample);
 					}
 					size_t cEls = sample_queue.size();
-					CString str;
-					str.Format(_T("After purge, queue size = %u\n"), cEls);
-					OutputDebugString(str);
-					av_log(avctx, AV_LOG_WARNING, "\nAfter purge, queue size = %u\n", cEls);
+					av_log(avctx, AV_LOG_WARNING, "\nAfter input accepted, queue size = %u\n", cEls);
 				}
 			}
 			else {
 				if (mf_result = MF_E_NOTACCEPTING) {
 					size_t cEls = sample_queue.size();
-					CString str;
-					str.Format(_T("queue size = %u\n"), cEls);
-					OutputDebugString(str);
 					if (input_packet->size) {
 						sample_queue.push(sample);
 					}
+					av_log(avctx, AV_LOG_WARNING, "\nAfter input rejected, queue size = %u\n", cEls);
 					result = MF_VIDEO_DECODER_SUCCESS;
 				}
 				else {
@@ -670,17 +677,6 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		else {
 			result = MF_VIDEO_DECODER_ERROR_INTERNAL;
 			av_log(avctx, AV_LOG_WARNING, "\nInternal error in decoder (%d)\n", mf_result);
-		}
-	}
-
-	if (result == MF_VIDEO_DECODER_SUCCESS) {
-		// get an output picture if one is ready
-		result = mf_video_decoder_get_next_picture(avctx, frame);
-		if (result == MF_VIDEO_DECODER_SUCCESS) {
-			*got_frame = 1;
-		}
-		else if (result == MF_VIDEO_DECODER_NEED_DATA) {
-			result = MF_VIDEO_DECODER_SUCCESS;
 		}
 	}
 
