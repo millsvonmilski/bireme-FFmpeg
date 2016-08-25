@@ -213,6 +213,7 @@ end:
     return mf_result;
 }
 
+DEFINE_GUID(CODECAPI_AVLowLatencyMode, 0x9c27891a, 0xed7a, 0x40e1, 0x88, 0xe8, 0xb2, 0x27, 0x27, 0xa0, 0x24, 0xee);
 /*----------------------------------------------------------------*/
 static int
 mf_video_decoder_init(AVCodecContext* avctx)
@@ -334,7 +335,18 @@ mf_video_decoder_init(AVCodecContext* avctx)
 
     // make sure the decoder is ready
     self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, NULL);
+	CComPtr<IMFAttributes> spAttributes;
 
+	HRESULT hr = self->decoder->GetAttributes(&spAttributes);
+	if (FAILED(hr))
+	{
+		MessageBoxA(NULL, "GetAttributes", "FAIL", 0);
+	}
+	hr = spAttributes->SetUINT32(CODECAPI_AVLowLatencyMode, VARIANT_TRUE);
+	if (FAILED(hr))
+	{
+		MessageBoxA(NULL, "SetAttributes", "FAIL", 0);
+	}
     return 0;
 }
 
