@@ -87,8 +87,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>c:\SDL-1.2.15\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\bt\ffmpeg-3-vc\ffplay\libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)SDL-1.2.15\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)SDL-1.2.15\lib\x64;$(SolutionDir)libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -188,8 +188,17 @@ copy ..\..\libswscale\libswscale.a ..\libs</Command>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>libavutil.a;libavcodec.a;libavdevice.a;libavfilter.a;libavformat.a;libswscale.a;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libavutil.a;libavcodec.a;libavdevice.a;libavfilter.a;libavformat.a;libswscale.a;sdl.lib;Ws2_32.lib;libswresample.a;Strmiids.lib;Shlwapi.lib;SECUR32.LIB;vfw32.lib;Shell32.lib;Mf.lib;MFCore.lib;MfPlat.lib;mfplay.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>copy ..\..\libavcodec\libavcodec.a ..\libs
+copy ..\..\libavdevice\libavdevice.a ..\libs
+copy ..\..\libavfilter\libavfilter.a ..\libs
+copy ..\..\libavformat\libavformat.a ..\libs
+copy ..\..\libavutil\libavutil.a ..\libs
+copy ..\..\libswresample\libswresample.a ..\libs
+copy ..\..\libswscale\libswscale.a ..\libs</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\cmdutils.c" />
