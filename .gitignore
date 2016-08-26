@@ -99,3 +99,8 @@ FfmpegAudioVideoToolboxDecoders.xcodeproj/project.xcworkspace
 FfmpegAudioVideoToolboxDecoders.xcodeproj/xcuserdata
 build
 patch.diff
+*.suo
+*.opendb
+*.db
+FfmpegMftDecoders/FfmpegMftDecoders/Debug/
+FfmpegMftDecoders/FfmpegMftDecoders/FfmpegMftDecoders.vcxproj.user
