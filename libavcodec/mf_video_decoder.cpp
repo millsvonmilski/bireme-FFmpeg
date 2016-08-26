@@ -101,6 +101,19 @@ typedef struct {
 } MF_VIDEO_DecoderContext;
 
 /*----------------------------------------------------------------*/
+static void
+mf_video_decoder_flush_samples(AVCodecContext *avctx)
+{
+    MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
+
+	// flush all buffered samples
+	while (!self->samples->empty()) {
+		self->samples->front()->Release();
+		self->samples->pop();
+	}
+}
+
+/*----------------------------------------------------------------*/
 static int
 mf_video_decoder_close(AVCodecContext* avctx)
 {
@@ -120,10 +133,9 @@ mf_video_decoder_close(AVCodecContext* avctx)
 		self->decoder->Release();
 		self->decoder = NULL;
 	}
-	while (!self->samples->empty()) {
-		self->samples->front()->Release();
-		self->samples->pop();
-	}
+
+	// make sure we flush all buffered samples
+	mf_video_decoder_flush_samples(avctx);
 	delete self->samples;
 
     return 0;
@@ -492,7 +504,15 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
     }
 #endif
 
-	// copy the sample format in the context (shouldn't be needed, but some progs depend on it
+	// set the timestamp
+	LONGLONG sample_time = 0;
+	mf_result = sample->GetSampleTime(&sample_time);
+	if (MF_SUCCEEDED(mf_result)) {
+		AVRational nano_timebase = { 1, 1000000000 };
+		frame->pts = av_rescale_q(sample_time, nano_timebase, avctx->pkt_timebase);
+	}
+
+	// copy the sample format in the context (shouldn't be needed, but some progs depend on it)
 	avctx->sample_fmt = (AVSampleFormat)frame->format;
 
 end:
@@ -571,6 +591,15 @@ mf_video_decoder_queue_sample(AVCodecContext* avctx, void* data, AVPacket* input
 		buffer->Release();
 	}
 
+	// set the timestamp
+	if (input_packet->pts >= 0) {
+		AVRational nano_timebase = {
+			1, 1000000000
+		};
+		LONGLONG pts = (LONGLONG)av_rescale_q(input_packet->pts, avctx->pkt_timebase, nano_timebase);
+		sample->SetSampleTime(pts);
+	}
+
 	// queue the sample
 	if (MF_SUCCEEDED(mf_result)) {
 		self->samples->push(sample);
@@ -587,7 +616,7 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
 	AVFrame*                 frame = (AVFrame*)data;
 
-	av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_decode - size=%d\n", input_packet->size);
+	av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_decode - size=%d, dts=%lld, pts=%lld\n", input_packet->size, input_packet->dts, input_packet->pts);
 
 	// default return value
 	*got_frame = 0;
@@ -600,8 +629,10 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		return -1;
 	}
 
-	// enqueue a sample
-	mf_video_decoder_queue_sample(avctx, data, input_packet);
+	// enqueue a sample unless the input packet is empty
+	if (input_packet->size) {
+		mf_video_decoder_queue_sample(avctx, data, input_packet);
+	}
 
 	// process the input data
 	for (;;) {
@@ -645,12 +676,15 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 
 /*----------------------------------------------------------------*/
 static void
-mf_video_decoder_flush(AVCodecContext *avctx)
+mf_video_decoder_flush(AVCodecContext* avctx)
 {
-    //MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
+	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
 
-    av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_flush\n");
+	// flush the decoder
+    self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH , NULL);
 
+	// flush all buffered samples
+	mf_video_decoder_flush_samples(avctx);
 }
 
 /*----------------------------------------------------------------

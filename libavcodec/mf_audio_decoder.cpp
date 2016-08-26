@@ -4,7 +4,7 @@
 // undefine this to get rid of the identifying sound in the audio
 // or define it to an array of small integers to make a frequency pattern
 // like for example: {1,2,1,3}
-#define MF_AUDIO_DECODER_ADD_IDENTIFYING_SOUND {2,3,2,4}
+//#define MF_AUDIO_DECODER_ADD_IDENTIFYING_SOUND {2,3,2,4}
 
 /*----------------------------------------------------------------
 | includes
