@@ -2256,9 +2256,9 @@ qsvenc_select="qsv"
 rdft_select="fft"
 
 # decoders / encoders
-h264_mf_video_decoder_select="mf_video_decoder h264_mp4toannexb_bsf mediafoundation"
-aac_mf_audio_decoder_select="mf_audio_decoder mediafoundation"
-mp3_mf_audio_decoder_select="mf_audio_decoder mediafoundation"
+h264_mf_video_decoder_select="mf_video_decoder h264_mp4toannexb_bsf"
+aac_mf_audio_decoder_select="mf_audio_decoder"
+mp3_mf_audio_decoder_select="mf_audio_decoder"
 h264_videotoolbox_decoder_select="videotoolbox_decoder"
 aac_audiotoolbox_decoder_select="audiotoolbox_decoder"
 mp3_audiotoolbox_decoder_select="audiotoolbox_decoder"
@@ -2497,7 +2497,9 @@ zmbv_decoder_select="zlib"
 zmbv_encoder_select="zlib"
 
 # platform codecs
-mediafoundation_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
+h264_mf_video_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
+aac_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
+mp3_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
 h264_videotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreVideo -framework VideoToolbox"
 aac_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
 mp3_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
@@ -2633,9 +2635,6 @@ vc1_parser_select="mpegvideo startcode vc1_decoder"
 mjpeg2jpeg_bsf_select="jpegtables"
 
 # external libraries
-h264_mf_video_decoder_deps="mediafoundation"
-aac_mf_audio_decoder_deps="mediafoundation"
-mp3_mf_audio_decoder_deps="mediafoundation"
 chromaprint_muxer_deps="chromaprint"
 libcelt_decoder_deps="libcelt"
 libdcadec_decoder_deps="libdcadec"
