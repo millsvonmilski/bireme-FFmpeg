@@ -342,7 +342,7 @@ mf_video_decoder_init(AVCodecContext* avctx)
 	{
 		MessageBoxA(NULL, "GetAttributes", "FAIL", 0);
 	}
-	hr = spAttributes->SetUINT32(CODECAPI_AVLowLatencyMode, VARIANT_TRUE);
+	hr = spAttributes->SetUINT32(CODECAPI_AVLowLatencyMode, 1);
 	if (FAILED(hr))
 	{
 		MessageBoxA(NULL, "SetAttributes", "FAIL", 0);
@@ -444,9 +444,12 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
     frame->format  = AV_PIX_FMT_YUV420P;
     frame->width   = avctx->width;
     frame->height  = avctx->height;
-    //frame->pts     = 
-    //frame->pkt_pts = frame->pts;
-    //frame->best_effort_timestamp = frame->pts;
+    LONGLONG lTime;
+    output_buffer.pSample->GetSampleTime(&lTime);
+
+    frame->pts = lTime / 10;
+    frame->pkt_pts = frame->pts;
+    frame->best_effort_timestamp = frame->pts;
     frame->reordered_opaque = avctx->reordered_opaque;
     
     // allocate the frame buffers
@@ -635,6 +638,8 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 			if (MF_SUCCEEDED(mf_result)) {
 				mf_result = sample->AddBuffer(buffer);
 			}
+
+			mf_result = sample->SetSampleTime(filtered_packet.pts*10);
 		}
 		if (MF_SUCCEEDED(mf_result)) {
 			CComPtr<IMFSample> spSample;
