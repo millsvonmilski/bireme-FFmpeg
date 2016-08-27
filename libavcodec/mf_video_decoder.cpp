@@ -98,6 +98,9 @@ typedef struct {
 #endif
 	IMFTransform*           decoder;
 	std::queue<IMFSample*>* samples; // keep this a pointer
+	bool                    draining;
+	uint64_t                output_frame_count;
+	uint64_t                input_frame_count;
 } MF_VIDEO_DecoderContext;
 
 /*----------------------------------------------------------------*/
@@ -215,9 +218,12 @@ mf_video_decoder_init(AVCodecContext* avctx)
     av_log(avctx, AV_LOG_TRACE, "mf_video_decoder_init\n");
 
 	// init
-	self->annexb_bsf_ctx = NULL;
-	self->decoder        = NULL;
-	self->samples        = NULL;
+	self->annexb_bsf_ctx     = NULL;
+	self->decoder            = NULL;
+	self->samples            = NULL;
+	self->draining           = false;
+	self->input_frame_count  = 0;
+	self->output_frame_count = 0;
 
 	// init the annex-b filter
 #if defined(MF_VIDEO_DECODER_USE_DEPRECATED_BSF_API)
@@ -332,7 +338,7 @@ mf_video_decoder_init(AVCodecContext* avctx)
     mf_video_decoder_set_output_type(self);
 
     // make sure the decoder is ready
-    self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, NULL);
+    self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
 
     return 0;
 }
@@ -603,6 +609,8 @@ mf_video_decoder_queue_sample(AVCodecContext* avctx, void* data, AVPacket* input
 	// queue the sample
 	if (MF_SUCCEEDED(mf_result)) {
 		self->samples->push(sample);
+		++self->input_frame_count;
+		av_log(avctx, AV_LOG_TRACE, "sample queued (%lld total)\n", self->input_frame_count);
 	}
 
 	// cleanup
@@ -634,12 +642,25 @@ mf_video_decoder_decode(AVCodecContext* avctx, void* data, int* got_frame, AVPac
 		mf_video_decoder_queue_sample(avctx, data, input_packet);
 	}
 
+	// check if we've reached the end of the stream
+	if (input_packet->size == 0 && self->samples->empty()) {
+		// we've decoded everything
+		if (!self->draining) {
+			av_log(avctx, AV_LOG_TRACE, "end of stream, start draining\n");
+			self->decoder->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0);
+			self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0);
+			self->draining = true;
+		}
+	}
+
 	// process the input data
 	for (;;) {
 		// get an output picture if one is ready
 		int result = mf_video_decoder_get_next_picture(avctx, frame);
 		if (result == MF_VIDEO_DECODER_SUCCESS) {
 			*got_frame = 1;
+			++self->output_frame_count;
+			av_log(avctx, AV_LOG_TRACE, "got frame (%lld total)\n", self->output_frame_count);
 			break;
 		} else if (result != MF_VIDEO_DECODER_NEED_DATA) {
 			av_log(avctx, AV_LOG_WARNING, "mf_video_decoder_get_next_picture returned %d\n", result);
@@ -681,10 +702,13 @@ mf_video_decoder_flush(AVCodecContext* avctx)
 	MF_VIDEO_DecoderContext* self = (MF_VIDEO_DecoderContext*)avctx->priv_data;
 
 	// flush the decoder
-    self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH , NULL);
+    self->decoder->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH , 0);
 
 	// flush all buffered samples
 	mf_video_decoder_flush_samples(avctx);
+
+	// reset the draining state
+	self->draining = false;
 }
 
 /*----------------------------------------------------------------
