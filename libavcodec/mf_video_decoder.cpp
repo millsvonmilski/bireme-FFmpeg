@@ -614,6 +614,7 @@ mf_video_decoder_queue_sample(AVCodecContext* avctx, void* data, AVPacket* input
 	}
 
 	// cleanup
+	av_free(filtered_buffer);
 	av_packet_unref(&filtered_packet);
 }
 
