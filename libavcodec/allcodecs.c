@@ -120,8 +120,12 @@ void avcodec_register_all(void)
     REGISTER_HWACCEL(WMV3_VDPAU,        wmv3_vdpau);
 
     /* video codecs */
+#ifdef __APPLE__
     REGISTER_DECODER(H264_VIDEOTOOLBOX, h264_videotoolbox);
-    REGISTER_DECODER(H264_MF_VIDEO,     h264_mf_video);
+#endif // __APPLE__
+#ifdef _MSC_VER
+    REGISTER_DECODER(H264_MF_VIDEO, h264_mf_video);
+#endif // _MSC_VER
     REGISTER_ENCODER(A64MULTI,          a64multi);
     REGISTER_ENCODER(A64MULTI5,         a64multi5);
     REGISTER_DECODER(AASC,              aasc);
@@ -377,10 +381,14 @@ void avcodec_register_all(void)
     REGISTER_ENCDEC (ZMBV,              zmbv);
 
     /* audio codecs */
-    REGISTER_DECODER(AAC_MF_AUDIO,      aac_mf_audio);
-    REGISTER_DECODER(MP3_MF_AUDIO,      mp3_mf_audio);
-    REGISTER_DECODER(AAC_AUDIOTOOLBOX,  aac_audiotoolbox);
-    REGISTER_DECODER(MP3_AUDIOTOOLBOX,  mp3_audiotoolbox);
+#ifdef _MSC_VER
+    REGISTER_DECODER(MP3_MF_AUDIO, mp3_mf_audio);
+    REGISTER_DECODER(AAC_MF_AUDIO, aac_mf_audio);
+#endif // _MSC_VER
+#ifdef __APPLE__
+    REGISTER_DECODER(AAC_AUDIOTOOLBOX, aac_audiotoolbox);
+    REGISTER_DECODER(MP3_AUDIOTOOLBOX, mp3_audiotoolbox);
+#endif // __APPLE__
     REGISTER_ENCDEC (AAC,               aac);
     REGISTER_DECODER(AAC_FIXED,         aac_fixed);
     REGISTER_DECODER(AAC_LATM,          aac_latm);
