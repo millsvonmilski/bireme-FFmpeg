@@ -2256,12 +2256,24 @@ qsvenc_select="qsv"
 rdft_select="fft"
 
 # decoders / encoders
-h264_mf_video_decoder_select="mf_video_decoder h264_mp4toannexb_bsf"
-aac_mf_audio_decoder_select="mf_audio_decoder"
-mp3_mf_audio_decoder_select="mf_audio_decoder"
-h264_videotoolbox_decoder_select="videotoolbox_decoder"
-aac_audiotoolbox_decoder_select="audiotoolbox_decoder"
-mp3_audiotoolbox_decoder_select="audiotoolbox_decoder"
+case $target_os in
+    mingw32*|mingw64*|win32|win64|cygwin*)
+        h264_mf_video_decoder_select="mf_video_decoder h264_mp4toannexb_bsf"
+        aac_mf_audio_decoder_select="mf_audio_decoder"
+        mp3_mf_audio_decoder_select="mf_audio_decoder" 
+        echo "HURRAY!!!!"
+        ;;
+    darwin)
+        h264_videotoolbox_decoder_select="videotoolbox_decoder"
+        aac_audiotoolbox_decoder_select="audiotoolbox_decoder"
+        mp3_audiotoolbox_decoder_select="audiotoolbox_decoder"
+        ;;
+    *)
+        die "We messed up"
+        ;;
+esac
+
+
 aac_decoder_select="imdct15 mdct sinewin"
 aac_fixed_decoder_select="mdct sinewin"
 aac_encoder_select="audio_frame_queue iirfilter lpc mdct sinewin"
@@ -2497,12 +2509,23 @@ zmbv_decoder_select="zlib"
 zmbv_encoder_select="zlib"
 
 # platform codecs
-h264_mf_video_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
-aac_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
-mp3_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
-h264_videotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreVideo -framework VideoToolbox"
-aac_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
-mp3_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
+# decoders / encoders
+case $target_os in
+    mingw32*|mingw64*|win32|win64|cygwin*)
+        h264_mf_video_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
+        aac_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
+        mp3_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
+        echo "HURRAY!!!!"
+        ;;
+    darwin)
+        h264_videotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreVideo -framework VideoToolbox"
+        aac_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
+        mp3_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
+        echo "HURRAY!!!!"
+        ;;
+    *)
+        die "We messed up"
+esac
 
 # hardware accelerators
 crystalhd_deps="libcrystalhd_libcrystalhd_if_h"
@@ -3162,6 +3185,17 @@ OUTDEV_LIST=$(find_things   outdev   OUTDEV   libavdevice/alldevices.c)
 INDEV_LIST=$(find_things    indev    _IN      libavdevice/alldevices.c)
 PROTOCOL_LIST=$(find_things protocol PROTOCOL libavformat/allformats.c)
 FILTER_LIST=$(find_things   filter   FILTER   libavfilter/allfilters.c)
+
+case $target_os in
+    darwin)
+        DECODER_LIST_ALT=$(find_things  decoder  BTMACD   libavcodec/allcodecs.c)
+        ;;
+    mingw32*|mingw64*|win32|win64|cygwin*)
+        DECODER_LIST_ALT=$(find_things  decoder  BTWIND   libavcodec/allcodecs.c)
+        ;;
+esac
+
+DECODER_LIST="$DECODER_LIST $DECODER_LIST_ALT"
 
 ALL_COMPONENTS="
     $BSF_LIST

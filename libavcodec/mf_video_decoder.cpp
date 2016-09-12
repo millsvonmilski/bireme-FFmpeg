@@ -8,6 +8,8 @@
 // define this if you want to use older versions of ffmpeg that don't
 // have the newer BSF API
 #define MF_VIDEO_DECODER_USE_DEPRECATED_BSF_API
+// The following define is needed for STL use eg std::queue
+#define _ALLOW_KEYWORD_MACROS 1
 
 /*----------------------------------------------------------------
 | includes

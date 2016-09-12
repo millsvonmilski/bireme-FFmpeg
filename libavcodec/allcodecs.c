@@ -49,6 +49,14 @@
             avcodec_register(&ff_##x##_decoder);                        \
     }
 
+#ifdef _MSC_VER
+#define REGISTER_BTWINDCODER(X, x)  REGISTER_DECODER(X, x)
+#define REGISTER_BTMACDCODER(X, x) 
+#elif __APPLE__
+#define REGISTER_BTMACDCODER(X, x) REGISTER_DECODER(X, x)
+#define REGISTER_BTWINDCODER(X, x) 
+#endif
+
 #define REGISTER_ENCDEC(X, x) REGISTER_ENCODER(X, x); REGISTER_DECODER(X, x)
 
 #define REGISTER_PARSER(X, x)                                           \
@@ -65,6 +73,7 @@
             av_register_bitstream_filter(&ff_##x##_bsf);                \
     }
 
+
 void avcodec_register_all(void)
 {
     static int initialized;
@@ -72,6 +81,16 @@ void avcodec_register_all(void)
     if (initialized)
         return;
     initialized = 1;
+
+    /* BitTorrent Specific Bypass codecs*/
+
+    REGISTER_BTWINDCODER(H264_MF_VIDEO, h264_mf_video);
+    REGISTER_BTWINDCODER(MP3_MF_AUDIO, mp3_mf_audio);
+    REGISTER_BTWINDCODER(AAC_MF_AUDIO, aac_mf_audio);
+    REGISTER_BTMACDCODER(H264_VIDEOTOOLBOX, h264_videotoolbox);
+    REGISTER_BTMACDCODER(AAC_AUDIOTOOLBOX, aac_audiotoolbox);
+    REGISTER_BTMACDCODER(MP3_AUDIOTOOLBOX, mp3_audiotoolbox);
+
 
     /* hardware accelerators */
     REGISTER_HWACCEL(H263_VAAPI,        h263_vaapi);
@@ -120,12 +139,7 @@ void avcodec_register_all(void)
     REGISTER_HWACCEL(WMV3_VDPAU,        wmv3_vdpau);
 
     /* video codecs */
-#ifdef __APPLE__
-    REGISTER_DECODER(H264_VIDEOTOOLBOX, h264_videotoolbox);
-#endif // __APPLE__
-#ifdef _MSC_VER
-    REGISTER_DECODER(H264_MF_VIDEO, h264_mf_video);
-#endif // _MSC_VER
+
     REGISTER_ENCODER(A64MULTI,          a64multi);
     REGISTER_ENCODER(A64MULTI5,         a64multi5);
     REGISTER_DECODER(AASC,              aasc);
@@ -381,14 +395,7 @@ void avcodec_register_all(void)
     REGISTER_ENCDEC (ZMBV,              zmbv);
 
     /* audio codecs */
-#ifdef _MSC_VER
-    REGISTER_DECODER(MP3_MF_AUDIO, mp3_mf_audio);
-    REGISTER_DECODER(AAC_MF_AUDIO, aac_mf_audio);
-#endif // _MSC_VER
-#ifdef __APPLE__
-    REGISTER_DECODER(AAC_AUDIOTOOLBOX, aac_audiotoolbox);
-    REGISTER_DECODER(MP3_AUDIOTOOLBOX, mp3_audiotoolbox);
-#endif // __APPLE__
+
     REGISTER_ENCDEC (AAC,               aac);
     REGISTER_DECODER(AAC_FIXED,         aac_fixed);
     REGISTER_DECODER(AAC_LATM,          aac_latm);
