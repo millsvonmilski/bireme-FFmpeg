@@ -517,7 +517,12 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
 	mf_result = sample->GetSampleTime(&sample_time);
 	if (MF_SUCCEEDED(mf_result)) {
 		AVRational nano_timebase = { 1, 1000000000 };
-		frame->pts = av_rescale_q(sample_time, nano_timebase, avctx->pkt_timebase);
+        avctx->reordered_opaque = sample_time / 10;
+        frame->pts = sample_time / 10; // av_rescale_q(sample_time, nano_timebase, avctx->pkt_timebase);
+        frame->pkt_pts = frame->pts;
+        frame->best_effort_timestamp = frame->pts;
+        frame->reordered_opaque = avctx->reordered_opaque;
+
 	}
 
 	// copy the sample format in the context (shouldn't be needed, but some progs depend on it)
@@ -601,11 +606,7 @@ mf_video_decoder_queue_sample(AVCodecContext* avctx, void* data, AVPacket* input
 
 	// set the timestamp
 	if (input_packet->pts >= 0) {
-		AVRational nano_timebase = {
-			1, 1000000000
-		};
-		LONGLONG pts = (LONGLONG)av_rescale_q(input_packet->pts, avctx->pkt_timebase, nano_timebase);
-		sample->SetSampleTime(pts);
+		sample->SetSampleTime(input_packet->pts * 10);
 	}
 
 	// queue the sample
