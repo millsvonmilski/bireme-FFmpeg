@@ -2277,7 +2277,6 @@ case $target_os in
         h264_mf_video_decoder_select="mf_video_decoder h264_mp4toannexb_bsf"
         aac_mf_audio_decoder_select="mf_audio_decoder"
         mp3_mf_audio_decoder_select="mf_audio_decoder" 
-        echo "HURRAY!!!!"
         ;;
     darwin)
         h264_videotoolbox_decoder_select="videotoolbox_decoder"
@@ -2531,13 +2530,11 @@ case $target_os in
         h264_mf_video_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
         aac_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
         mp3_mf_audio_decoder_extralibs="mfplat.lib mfuuid.lib wmcodecdspuuid.lib ole32.lib"
-        echo "HURRAY!!!!"
         ;;
     darwin)
         h264_videotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreVideo -framework VideoToolbox"
         aac_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
         mp3_audiotoolbox_decoder_extralibs="-framework CoreMedia -framework CoreAudio -framework AudioToolbox"
-        echo "HURRAY!!!!"
         ;;
     *)
         die "We messed up"
