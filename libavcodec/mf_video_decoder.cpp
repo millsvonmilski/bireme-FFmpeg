@@ -3,7 +3,7 @@
 +----------------------------------------------------------------*/
 // undefine this to get rid of the identifying mark in the pictures
 // or define it to a max-4 digit number encoded as hex-coded decimal
-#define MF_VIDEO_DECODER_IDENTIFYING_MARK 0xF00D
+#define MF_VIDEO_DECODER_IDENTIFYING_MARK 0xBEEF
 
 // define this if you want to use older versions of ffmpeg that don't
 // have the newer BSF API
@@ -516,9 +516,8 @@ mf_video_decoder_get_next_picture(AVCodecContext* avctx, AVFrame* frame)
 	LONGLONG sample_time = 0;
 	mf_result = sample->GetSampleTime(&sample_time);
 	if (MF_SUCCEEDED(mf_result)) {
-		AVRational nano_timebase = { 1, 1000000000 };
         avctx->reordered_opaque = sample_time / 10;
-        frame->pts = sample_time / 10; // av_rescale_q(sample_time, nano_timebase, avctx->pkt_timebase);
+        frame->pts = sample_time / 10; 
         frame->pkt_pts = frame->pts;
         frame->best_effort_timestamp = frame->pts;
         frame->reordered_opaque = avctx->reordered_opaque;

@@ -372,7 +372,7 @@ mf_audio_decoder_init(AVCodecContext* avctx)
 	} else if (avctx->codec_id == AV_CODEC_ID_MP3) {
 		// we need to instantiate the MFTransform object directly...
 		self->audio_format = MFAudioFormat_MP3;
-	    mf_result = CoCreateInstance(CLSID_CMP3DecMediaObject, NULL,  CLSCTX_INPROC_SERVER, IID_IMFTransform, (void**)&self->decoder);
+	    mf_result = CoCreateInstance(__uuidof(CMP3DecMediaObject), NULL,  CLSCTX_INPROC_SERVER, IID_IMFTransform, (void**)&self->decoder);
 		if (mf_result != S_OK) {
 			av_log(avctx, AV_LOG_WARNING, "failed to created MP3 decoder (%d)\n", mf_result);
 		}

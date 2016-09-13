@@ -1385,6 +1385,22 @@ cp_if_changed(){
     $cp_f "$1" "$2"
 }
 
+# OS
+target_os_default=$(tolower $(uname -s))
+
+host_os=$target_os_default
+
+# machine
+if test "$target_os_default" = aix; then
+    arch_default=$(uname -p)
+    strip_default="strip -X32_64"
+else
+    arch_default=$(uname -m)
+fi
+cpu="generic"
+intrinsics="none"
+set_default target_os
+
 # CONFIG_LIST contains configurable options, while HAVE_LIST is for
 # system-dependent things.
 
@@ -3058,20 +3074,6 @@ strip_default="strip"
 yasmexe_default="yasm"
 windres_default="windres"
 
-# OS
-target_os_default=$(tolower $(uname -s))
-host_os=$target_os_default
-
-# machine
-if test "$target_os_default" = aix; then
-    arch_default=$(uname -p)
-    strip_default="strip -X32_64"
-else
-    arch_default=$(uname -m)
-fi
-cpu="generic"
-intrinsics="none"
-
 # configurable options
 enable $PROGRAM_LIST
 enable $DOCUMENT_LIST
@@ -3480,7 +3482,7 @@ windres_default="${cross_prefix}${windres_default}"
 sysinclude_default="${sysroot}/usr/include"
 
 set_default arch cc cxx doxygen pkg_config ranlib strip sysinclude \
-    target_exec target_os yasmexe
+    target_exec yasmexe
 enabled cross_compile || host_cc_default=$cc
 set_default host_cc
 
@@ -5689,7 +5691,7 @@ if ! disabled sdl; then
         elif enabled sdl ; then
             #die "ERROR: SDL not found"
             sdl_cflags="-I${sdl_dir}/include"
-            sdl_libs="-lSDL -L${sdl_dir}/lib/x86"
+            sdl_libs="-lSDL -L${sdl_dir}/lib/x64"
             enable sdl
         else
             disable sdl
@@ -5699,7 +5701,6 @@ if ! disabled sdl; then
         sdl_libs="$sdl_libs -mconsole"
     fi
 fi
-enabled sdl && add_cflags $sdl_cflags && add_extralibs $sdl_libs
 
 disabled securetransport || { check_func SecIdentityCreate "-Wl,-framework,CoreFoundation -Wl,-framework,Security" &&
     check_lib2 "Security/SecureTransport.h Security/Security.h" "SSLCreateContext SecItemImport" "-Wl,-framework,CoreFoundation -Wl,-framework,Security" &&
@@ -6146,6 +6147,8 @@ for thread in $THREADS_LIST; do
 done
 
 enabled zlib && add_cppflags -DZLIB_CONST
+
+enabled sdl && add_cflags $sdl_cflags && add_extralibs $sdl_libs
 
 # conditional library dependencies, in linking order
 enabled afftfilt_filter     && prepend avfilter_deps "avcodec"
