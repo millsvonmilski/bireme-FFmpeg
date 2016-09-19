@@ -3,7 +3,7 @@
 +----------------------------------------------------------------*/
 // undefine this to get rid of the identifying mark in the pictures
 // or define it to a max-4 digit number encoded as hex-coded decimal
-#define MF_VIDEO_DECODER_IDENTIFYING_MARK 0xF00D
+//#define MF_VIDEO_DECODER_IDENTIFYING_MARK 0xF00D
 
 // define this if you want to use older versions of ffmpeg that don't
 // have the newer BSF API
